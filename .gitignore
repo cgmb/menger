@@ -1,0 +1,7 @@
+/rawr
+*.o
+*.a
+*.so
+.*
+!.gitignore
+!.gitmodule

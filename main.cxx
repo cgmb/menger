@@ -1,15 +1,32 @@
 #include <iostream>
 #include <GL/glut.h>
 
+float vbuffer[] = {
+  0.25, 0.25, 0.0,
+  0.55, 0.25, 0.0,
+  0.55, 0.55, 0.0,
+  0.25, 0.55, 0.0
+};
+
+size_t ibuffer[] = {
+  0, 1, 2, 3, 0
+};
+
+size_t ibuffer_size 
+  = sizeof(ibuffer)/sizeof(ibuffer[0]);
+
+float* index3f(size_t i) {
+  return vbuffer + (3u * i);
+}
+
 void display() {
   glClear(GL_COLOR_BUFFER_BIT);
 
   glColor3f(1.0, 1.0, 1.0);
   glBegin(GL_POLYGON);
-    glVertex3f(0.25, 0.25, 0.0);
-    glVertex3f(0.55, 0.25, 0.0);
-    glVertex3f(0.55, 0.55, 0.0);
-    glVertex3f(0.25, 0.55, 0.0);
+  for (size_t i = 0; i < ibuffer_size; ++i) {
+    glVertex3fv(index3f(ibuffer[i]));
+  }
   glEnd();
   printf("I am redrawing!\n"); 
 

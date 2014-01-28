@@ -1,14 +1,14 @@
 #include <GL/glut.h>
 
 float vbuffer[] = {
-  0.25, 0.25, 0.75, // 0 back top left
-  0.75, 0.25, 0.75, // 1 back top right
-  0.75, 0.75, 0.75, // 2 back bottom right
-  0.25, 0.75, 0.75, // 3 back bottom left
-  0.25, 0.25, 0.25, // 4 front top left
-  0.75, 0.25, 0.25, // 5 front top right
-  0.75, 0.75, 0.25, // 6 front bottom right
-  0.25, 0.75, 0.25, // 7 front bottom left
+  -0.5, -0.5,  0.5, // 0 back top left
+   0.5, -0.5,  0.5, // 1 back top right
+   0.5,  0.5,  0.5, // 2 back bottom right
+  -0.5,  0.5,  0.5, // 3 back bottom left
+  -0.5, -0.5, -0.5, // 4 front top left
+   0.5, -0.5, -0.5, // 5 front top right
+   0.5,  0.5, -0.5, // 6 front bottom right
+  -0.5,  0.5, -0.5, // 7 front bottom left
 };
 
 size_t ibuffer[] = {
@@ -33,19 +33,83 @@ float normal_scale(int value, int offset, int steps) {
   return ((value + offset) % steps) / (float)steps;
 }
 
-void display() {
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-  glColor3f(1.0, 1.0, 1.0);
+void draw_cube() {
   glBegin(GL_TRIANGLES);
   for (size_t i = 0; i < ibuffer_size; ++i) {
     glColor3f(
-      normal_scale(ibuffer[i], 1, 6), 
-      normal_scale(ibuffer[i], 2, 6), 
-      normal_scale(ibuffer[i], 3, 6));
+      normal_scale(ibuffer[i], 6, 8), 
+      normal_scale(ibuffer[i], 0, 8), 
+      normal_scale(ibuffer[i], 3, 8));
     glVertex3fv(vertex3f(vbuffer, ibuffer[i]));
   }
   glEnd();
+}
+
+void draw_unit() {
+  // move to bottom corner and draw ring
+  glTranslatef(-1, -1, -1);
+  draw_cube();
+  glTranslatef(1, 0, 0);
+  draw_cube();
+  glTranslatef(1, 0, 0);
+  draw_cube();
+  glTranslatef(0, 1, 0);
+  draw_cube();
+  glTranslatef(0, 1, 0);
+  draw_cube();
+  glTranslatef(-1, 0, 0);
+  draw_cube();
+  glTranslatef(-1, 0, 0);
+  draw_cube();
+  glTranslatef(0, -1, 0);
+  draw_cube();
+
+  // move to next row and draw ring with holes
+  glTranslatef(0, -1, 1);
+  draw_cube();
+
+  glTranslatef(1, 0, 0);
+//  draw_cube();
+  glTranslatef(1, 0, 0);
+  draw_cube();
+  glTranslatef(0, 1, 0);
+//  draw_cube();
+  glTranslatef(0, 1, 0);
+  draw_cube();
+  glTranslatef(-1, 0, 0);
+//  draw_cube();
+  glTranslatef(-1, 0, 0);
+  draw_cube();
+  glTranslatef(0, -1, 0);
+//  draw_cube();
+  
+  // move to next row and draw ring again
+  glTranslatef(0, -1, 1);
+  draw_cube();
+
+  glTranslatef(1, 0, 0);
+  draw_cube();
+  glTranslatef(1, 0, 0);
+  draw_cube();
+  glTranslatef(0, 1, 0);
+  draw_cube();
+  glTranslatef(0, 1, 0);
+  draw_cube();
+  glTranslatef(-1, 0, 0);
+  draw_cube();
+  glTranslatef(-1, 0, 0);
+  draw_cube();
+  glTranslatef(0, -1, 0);
+  draw_cube();
+
+  // move back to center
+  glTranslatef(1, 0, -1);
+}
+
+void display() {
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  draw_unit();
 
   glutSwapBuffers();
 }
@@ -57,6 +121,8 @@ void init() {
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
   glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
+  glTranslatef(0.5, 0.5, 0.5);
+  glScalef(1.0/8, 1.0/8, 1.0/8);
   glRotatef(30.0, 1.0, 1.0, 1.0);
 }
 
@@ -79,7 +145,7 @@ void reshape(int w, int h) {
 int main(int argc, char** argv) {
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_DOUBLE | GLUT_DEPTH | GLUT_RGB);
-  glutInitWindowSize(250, 250); 
+  glutInitWindowSize(480, 480); 
   glutInitWindowPosition(100, 100);
   glutCreateWindow ("RAWR!");
   init();

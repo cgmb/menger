@@ -1,5 +1,5 @@
 #!/bin/sh -e
-g++ main.cxx -o rawr \
- -std=c++0x -O2 \
- -Werror -Wall -Wextra \
+gcc main.cxx -o rawr \
+ -O2 \
+ -Werror -Wall -Wextra -Wno-unused-parameter \
  -lGL -lGLU -lglut 

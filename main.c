@@ -35,7 +35,8 @@ float normal_scale(int value, int offset, int steps) {
 
 void draw_cube() {
   glBegin(GL_TRIANGLES);
-  for (size_t i = 0; i < ibuffer_size; ++i) {
+  size_t i;
+  for (i = 0; i < ibuffer_size; ++i) {
     glColor3f(
       normal_scale(ibuffer[i], 6, 8), 
       normal_scale(ibuffer[i], 0, 8), 
@@ -128,7 +129,8 @@ unsigned bound_unsigned(unsigned min, unsigned value, unsigned max) {
 
 float power_fu(float x, unsigned y) {
   float value = 1.0;
-  for (unsigned i=0; i<y; ++i) {
+  unsigned i;
+  for (i = 0; i < y; ++i) {
     value *= x;
   }
   return value;
@@ -158,7 +160,7 @@ void draw_menger_sponge(unsigned depth) {
 void display() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-  draw_menger_sponge(2);
+  draw_menger_sponge(1);
 
   glutSwapBuffers();
 }
@@ -171,7 +173,7 @@ void init() {
   glLoadIdentity();
   glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
   glTranslatef(0.5, 0.5, 0.5);
-  glScalef(1.0/64, 1.0/64, 1.0/64);
+  glScalef(1.0/16.0, 1.0/16.0, 1.0/16.0);
   glRotatef(30.0, 1.0, 1.0, 1.0);
 }
 
@@ -204,4 +206,5 @@ int main(int argc, char** argv) {
   glutMouseFunc(mouse_press);
   glutMotionFunc(mouse_move);
   glutMainLoop();
+  return 0;
 }

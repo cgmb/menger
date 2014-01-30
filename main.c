@@ -1,4 +1,5 @@
 #include <GL/glut.h>
+#include <math.h>
 
 float vbuffer[] = {
   -0.5, -0.5,  0.5, // 0 back top left
@@ -159,13 +160,19 @@ void draw_menger_sponge(unsigned depth) {
 
 float g_camera_rotation_x = 0.0;
 float g_camera_rotation_y = 0.0;
+float g_temp_camera_scale = 1.0;
+float g_perm_camera_scale = 1.0;
 
-void update_camera_pose() {
+void setup_world_camera() {
   glRotatef(g_camera_rotation_x, 0, 1, 0);
   glRotatef(g_camera_rotation_y, 1, 0, 0);
+  glScalef(g_temp_camera_scale, g_temp_camera_scale, g_temp_camera_scale);
+  glScalef(g_perm_camera_scale, g_perm_camera_scale, g_perm_camera_scale);
 }
 
-void clean_camera_pose() {
+void teardown_world_camera() {
+  glScalef(1/g_perm_camera_scale, 1/g_perm_camera_scale, 1/g_perm_camera_scale);
+  glScalef(1/g_temp_camera_scale, 1/g_temp_camera_scale, 1/g_temp_camera_scale);
   glRotatef(-g_camera_rotation_y, 1, 0, 0);
   glRotatef(-g_camera_rotation_x, 0, 1, 0);
 }
@@ -173,9 +180,9 @@ void clean_camera_pose() {
 void display() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-  update_camera_pose();
+  setup_world_camera();
   draw_menger_sponge(1);
-  clean_camera_pose();
+  teardown_world_camera();
 
   glutSwapBuffers();
 }
@@ -193,6 +200,7 @@ void init() {
 }
 
 int g_rotating = 0;
+int g_scaling = 0;
 int g_last_x = 0;
 int g_last_y = 0;
 
@@ -203,9 +211,16 @@ void mouse_press(int button, int state, int x, int y) {
   if (state == GLUT_DOWN) {
     g_last_x = x;
     g_last_y = y;
-    g_rotating = 1;
+    if (button == GLUT_LEFT_BUTTON) {
+      g_rotating = 1;
+    } else if (button == GLUT_RIGHT_BUTTON) {
+      g_scaling = 1;
+    }
   } else if (state == GLUT_UP) {
     g_rotating = 0;
+    g_scaling = 0;
+    g_perm_camera_scale *= g_temp_camera_scale;
+    g_temp_camera_scale = 1.0;
   }
 }
 
@@ -218,6 +233,12 @@ void mouse_move(int x, int y) {
     g_camera_rotation_y += 360.0 * (diff_y / g_window_size_y);
     g_last_x = x;
     g_last_y = y;
+
+    glutPostRedisplay();
+  } else if (g_scaling) {
+    float diff_y = g_last_y - y;
+
+    g_temp_camera_scale = powf(2, (diff_y / g_window_size_y));
 
     glutPostRedisplay();
   }

@@ -20,7 +20,7 @@ size_t ibuffer[] = {
   6, 5, 4, 7, 6, 4, // front
 };
 
-size_t ibuffer_size 
+size_t ibuffer_size
   = sizeof(ibuffer)/sizeof(ibuffer[0]);
 
 // lookup a vertex within the given float buffer
@@ -38,9 +38,9 @@ void draw_cube() {
   size_t i;
   for (i = 0; i < ibuffer_size; ++i) {
     glColor3f(
-      normal_scale(ibuffer[i], 6, 8), 
-      normal_scale(ibuffer[i], 0, 8), 
-      normal_scale(ibuffer[i], 3, 8));
+      normal_scale(i/6, 0, 6),
+      normal_scale(i/6, 2, 6),
+      normal_scale(i/6, 4, 6));
     glVertex3fv(vertex3f(vbuffer, ibuffer[i]));
   }
   glEnd();
@@ -48,7 +48,7 @@ void draw_cube() {
 
 typedef void(*draw_fn)();
 
-// draws the Menger sponge pattern using blocks drawn 
+// draws the Menger sponge pattern using blocks drawn
 // by the draw function. The size of each block is
 // specified by s.
 void draw_pattern(draw_fn draw, float s) {
@@ -88,7 +88,7 @@ void draw_pattern(draw_fn draw, float s) {
   draw();
   glTranslatef(0, -s, 0);
 //  draw();
-  
+
   // move to next row and draw ring again
   glTranslatef(0, -s, s);
   draw();
@@ -157,10 +157,25 @@ void draw_menger_sponge(unsigned depth) {
   draw_pattern_recursive();
 }
 
+float g_camera_rotation_x = 0.0;
+float g_camera_rotation_y = 0.0;
+
+void update_camera_pose() {
+  glRotatef(g_camera_rotation_x, 0, 1, 0);
+  glRotatef(g_camera_rotation_y, 1, 0, 0);
+}
+
+void clean_camera_pose() {
+  glRotatef(-g_camera_rotation_y, 1, 0, 0);
+  glRotatef(-g_camera_rotation_x, 0, 1, 0);
+}
+
 void display() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+  update_camera_pose();
   draw_menger_sponge(1);
+  clean_camera_pose();
 
   glutSwapBuffers();
 }
@@ -177,16 +192,35 @@ void init() {
   glRotatef(30.0, 1.0, 1.0, 1.0);
 }
 
+int g_rotating = 0;
+int g_last_x = 0;
+int g_last_y = 0;
+
+int g_window_size_x = 480;
+int g_window_size_y = 480;
+
 void mouse_press(int button, int state, int x, int y) {
   if (state == GLUT_DOWN) {
-    glRotatef(1, 1.0, 1.0, 1.0);
-    glutPostRedisplay();
+    g_last_x = x;
+    g_last_y = y;
+    g_rotating = 1;
+  } else if (state == GLUT_UP) {
+    g_rotating = 0;
   }
 }
 
 void mouse_move(int x, int y) {
-  glRotatef(1, 1.0, 1.0, 1.0);
-  glutPostRedisplay();
+  if (g_rotating) {
+    float diff_x = g_last_x - x;
+    float diff_y = g_last_y - y;
+
+    g_camera_rotation_x += 360.0 * (diff_x / g_window_size_x);
+    g_camera_rotation_y += 360.0 * (diff_y / g_window_size_y);
+    g_last_x = x;
+    g_last_y = y;
+
+    glutPostRedisplay();
+  }
 }
 
 void reshape(int w, int h) {
@@ -196,11 +230,11 @@ void reshape(int w, int h) {
 int main(int argc, char** argv) {
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_DOUBLE | GLUT_DEPTH | GLUT_RGB);
-  glutInitWindowSize(480, 480); 
+  glutInitWindowSize(g_window_size_x, g_window_size_y);
   glutInitWindowPosition(100, 100);
   glutCreateWindow ("C Menger Sponge");
   init();
-  display(); 
+  display();
   glutDisplayFunc(display);
   glutReshapeFunc(reshape);
   glutMouseFunc(mouse_press);

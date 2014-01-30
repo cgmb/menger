@@ -224,7 +224,11 @@ void mouse_move(int x, int y) {
 }
 
 void reshape(int w, int h) {
-  glViewport(0, 0, w, h);
+  if (w > h) {
+    glViewport(0, 0, bound_unsigned(0, w, h), h);
+  } else {
+    glViewport(0, 0, w, bound_unsigned(0, h, w));
+  }
 }
 
 int main(int argc, char** argv) {

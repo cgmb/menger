@@ -1,5 +1,8 @@
-#include <GL/glut.h>
+#include <errno.h>
 #include <math.h>
+#include <stdlib.h>
+#include <string.h>
+#include <GL/glut.h>
 
 float vbuffer[] = {
   -0.5, -0.5,  0.5, // 0 back top left
@@ -177,11 +180,13 @@ void teardown_world_camera() {
   glRotatef(-g_camera_rotation_x, 0, 1, 0);
 }
 
+unsigned g_recurse_depth = 1;
+
 void display() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   setup_world_camera();
-  draw_menger_sponge(1);
+  draw_menger_sponge(g_recurse_depth);
   teardown_world_camera();
 
   glutSwapBuffers();
@@ -244,6 +249,60 @@ void mouse_move(int x, int y) {
   }
 }
 
+enum {
+  NORMAL = 27, // esc
+  SCALE_ENTRY = 's',
+  RECURSE_ENTRY = 'r',
+  ENTER_COMMAND = 13, // enter
+};
+
+unsigned g_command_state = NORMAL;
+enum { MAX_ARG_LENGTH = 5 };
+char g_arg_text[MAX_ARG_LENGTH + 1] = {};
+size_t g_arg_text_i = 0;
+
+void key_press(unsigned char key, int x, int y) {
+  switch (g_command_state) {
+    case SCALE_ENTRY:
+      if (key == ENTER_COMMAND) {
+        char* end;
+        float number = strtof(g_arg_text, &end);
+        if (*end == '\0' && errno != EINVAL && 
+            errno != ERANGE && number != 0.0) {
+          g_perm_camera_scale = 1/number;
+          glutPostRedisplay();
+        }        
+        g_command_state = NORMAL;
+      } else if (g_arg_text_i < MAX_ARG_LENGTH) {
+        g_arg_text[g_arg_text_i++] = key;
+      }
+      break;
+    case RECURSE_ENTRY:
+      if (key == ENTER_COMMAND) {
+        char* end;
+        long number = strtol(g_arg_text, &end, 10);
+        if (*end == '\0' && errno != EINVAL && 
+            errno != ERANGE && number >= 0 && number <= (long)MAX_DEPTH) {
+          g_recurse_depth = (unsigned)number;
+          glutPostRedisplay();
+        }        
+        g_command_state = NORMAL;
+      } else if (g_arg_text_i < MAX_ARG_LENGTH) {
+        g_arg_text[g_arg_text_i++] = key;
+      }
+      break;
+    default: // enter state
+      g_command_state = key;
+      switch(g_command_state) { 
+        case SCALE_ENTRY:
+        case RECURSE_ENTRY:
+          memset(g_arg_text, 0, 5);
+          g_arg_text_i = 0;
+          break;
+      }
+  }
+}
+
 void reshape(int w, int h) {
   if (w > h) {
     glViewport(0, 0, bound_unsigned(0, w, h), h);
@@ -264,6 +323,7 @@ int main(int argc, char** argv) {
   glutReshapeFunc(reshape);
   glutMouseFunc(mouse_press);
   glutMotionFunc(mouse_move);
+  glutKeyboardFunc(key_press);
   glutMainLoop();
   return 0;
 }

@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <GL/glut.h>
@@ -123,7 +124,7 @@ void draw_unit() {
   draw_pattern(draw_cube, 1);
 }
 
-const unsigned MAX_DEPTH = 4u;
+const unsigned MAX_DEPTH = 6u;
 
 unsigned bound_unsigned(unsigned min, unsigned value, unsigned max) {
   if (value > max) {
@@ -327,40 +328,66 @@ void key_press(unsigned char key, int x, int y) {
       if (key == ENTER_COMMAND) {
         char* end;
         float number = strtof(g_arg_text, &end);
-        if (*end == '\0' && errno != EINVAL && 
+        if (*end == '\0' && errno != EINVAL &&
             errno != ERANGE && number != 0.0) {
           g_perm_camera_scale = 1/number;
           glutPostRedisplay();
-        }        
+        } else {
+           printf("\ninvalid scale");
+        }
         g_command_state = NORMAL;
+        printf("\n");
+      } else if (key == 27) {
+        g_command_state = NORMAL;
+        printf(" - cancelled\n");
       } else if (g_arg_text_i < MAX_ARG_LENGTH) {
         g_arg_text[g_arg_text_i++] = key;
+        printf("%c", key);
+        fflush(stdout);
       }
       break;
     case RECURSE_ENTRY:
       if (key == ENTER_COMMAND) {
         char* end;
         long number = strtol(g_arg_text, &end, 10);
-        if (*end == '\0' && errno != EINVAL && 
+        if (*end == '\0' && errno != EINVAL &&
             errno != ERANGE && number >= 0 && number <= (long)MAX_DEPTH) {
           g_recurse_depth = (unsigned)number;
           glutPostRedisplay();
-        }        
+        } else {
+           printf("\ninvalid recursive depth");
+        }
         g_command_state = NORMAL;
+        printf("\n");
+      } else if (key == 27) {
+        g_command_state = NORMAL;
+        printf(" - cancelled\n");
       } else if (g_arg_text_i < MAX_ARG_LENGTH) {
         g_arg_text[g_arg_text_i++] = key;
+        printf("%c", key);
+        fflush(stdout);
       }
       break;
     default: // enter state
       g_command_state = key;
-      switch(g_command_state) { 
+      switch(g_command_state) {
         case SCALE_ENTRY:
         case RECURSE_ENTRY:
-          memset(g_arg_text, 0, 5);
+          memset(g_arg_text, 0, MAX_ARG_LENGTH);
           g_arg_text_i = 0;
+          printf("%c:", key);
+          fflush(stdout);
           break;
         case QUIT_COMMAND:
           exit(0);
+        case NORMAL:
+          break;
+        default:
+	  printf("unknown command: %c\n", key);
+          printf("known commands are:\n"
+            "  s - scale\n"
+            "  r - recursion depth [0,%u]\n"
+            "  q - fast quit\n", MAX_DEPTH);
       }
   }
 }

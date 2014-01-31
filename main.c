@@ -253,6 +253,7 @@ enum {
   NORMAL = 27, // esc
   SCALE_ENTRY = 's',
   RECURSE_ENTRY = 'r',
+  QUIT_COMMAND = 'q',
   ENTER_COMMAND = 13, // enter
 };
 
@@ -299,6 +300,8 @@ void key_press(unsigned char key, int x, int y) {
           memset(g_arg_text, 0, 5);
           g_arg_text_i = 0;
           break;
+        case QUIT_COMMAND:
+          exit(0);
       }
   }
 }

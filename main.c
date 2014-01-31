@@ -4,7 +4,7 @@
 #include <string.h>
 #include <GL/glut.h>
 
-float vbuffer[] = {
+float cube_vbuffer[] = {
   -0.5, -0.5,  0.5, // 0 back top left
    0.5, -0.5,  0.5, // 1 back top right
    0.5,  0.5,  0.5, // 2 back bottom right
@@ -15,7 +15,7 @@ float vbuffer[] = {
   -0.5,  0.5, -0.5, // 7 front bottom left
 };
 
-size_t ibuffer[] = {
+size_t cube_ibuffer[] = {
   0, 1, 2, 0, 2, 3, // back
   5, 1, 0, 4, 5, 0, // top
   7, 4, 0, 3, 7, 0, // left
@@ -24,8 +24,11 @@ size_t ibuffer[] = {
   6, 5, 4, 7, 6, 4, // front
 };
 
-size_t ibuffer_size
-  = sizeof(ibuffer)/sizeof(ibuffer[0]);
+size_t cube_ibuffer_size
+  = sizeof(cube_ibuffer)/sizeof(cube_ibuffer[0]);
+
+size_t* square_ibuffer = cube_ibuffer + 0;
+size_t square_ibuffer_size = 6;
 
 // lookup a vertex within the given float buffer
 float* vertex3f(float* buffer, size_t index) {
@@ -40,12 +43,12 @@ float normal_scale(int value, int offset, int steps) {
 void draw_cube() {
   glBegin(GL_TRIANGLES);
   size_t i;
-  for (i = 0; i < ibuffer_size; ++i) {
+  for (i = 0; i < cube_ibuffer_size; ++i) {
     glColor3f(
       normal_scale(i/6, 0, 6),
       normal_scale(i/6, 2, 6),
       normal_scale(i/6, 4, 6));
-    glVertex3fv(vertex3f(vbuffer, ibuffer[i]));
+    glVertex3fv(vertex3f(cube_vbuffer, cube_ibuffer[i]));
   }
   glEnd();
 }
@@ -182,12 +185,69 @@ void teardown_world_camera() {
 
 unsigned g_recurse_depth = 1;
 
+typedef void(*button_fn)();
+
+void draw_button(float r, float g, float b) {
+  glBegin(GL_TRIANGLES);
+  size_t i;
+  for (i = 0; i < square_ibuffer_size; ++i) {
+    glColor3f(r, g, b);
+    glVertex3fv(vertex3f(cube_vbuffer, square_ibuffer[i]));
+  }
+  glEnd();
+}
+
+void draw_buttons() {
+  glScalef(1.0/16, 1.0/16, 1.0/16);
+  glTranslatef(1.0/2, 1.0/2, 0);
+
+  draw_button(1, 1, 1);
+  glTranslatef(0, 1, 0);
+  draw_button(0, 1, 1);
+  glTranslatef(0, 1, 0);
+  draw_button(1, 0, 1);
+  glTranslatef(0, 1, 0);
+  draw_button(1, 1, 0);
+
+  glTranslatef(1, -3, 0);
+  draw_button(1, 0, 0);
+  glTranslatef(0, 1, 0);
+  draw_button(0, 1, 0);
+  glTranslatef(0, 1, 0);
+  draw_button(0, 0, 1);
+
+  glTranslatef(1, -2, 0);
+  draw_button(0.5, 0.5, 0.5);
+  glTranslatef(0, 1, 0);
+  draw_button(0.5, 0.0, 0.5);
+
+  glTranslatef(1, -1, 0);
+  draw_button(0.0, 0.5, 0.5);
+}
+
+void reset_to_ortho() {
+  glLoadIdentity();
+  glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
+}
+
+void setup_initial_transform() {
+  reset_to_ortho();
+  glTranslatef(0.5, 0.5, 0.5);
+  glScalef(1.0/16.0, 1.0/16.0, 1.0/16.0);
+  glRotatef(30.0, 1.0, 1.0, 1.0);
+}
+
 void display() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  setup_initial_transform();
 
   setup_world_camera();
   draw_menger_sponge(g_recurse_depth);
   teardown_world_camera();
+
+  reset_to_ortho();
+  draw_buttons();
 
   glutSwapBuffers();
 }
@@ -197,11 +257,6 @@ void init() {
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_CULL_FACE);
   glMatrixMode(GL_PROJECTION);
-  glLoadIdentity();
-  glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
-  glTranslatef(0.5, 0.5, 0.5);
-  glScalef(1.0/16.0, 1.0/16.0, 1.0/16.0);
-  glRotatef(30.0, 1.0, 1.0, 1.0);
 }
 
 int g_rotating = 0;

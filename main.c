@@ -225,9 +225,13 @@ void draw_buttons() {
   draw_button(0.0, 0.5, 0.5);
 }
 
+float g_aspect_scale_x = 1.0;
+float g_aspect_scale_y = 1.0;
+
 void reset_to_ortho() {
   glLoadIdentity();
   glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
+  glScalef(g_aspect_scale_x, g_aspect_scale_y, 1.0);
 }
 
 void setup_initial_transform() {
@@ -362,10 +366,13 @@ void key_press(unsigned char key, int x, int y) {
 }
 
 void reshape(int w, int h) {
+  glViewport(0, 0, w, h);
   if (w > h) {
-    glViewport(0, 0, bound_unsigned(0, w, h), h);
+    g_aspect_scale_x = h / (float)w;
+    g_aspect_scale_y = 1.0;
   } else {
-    glViewport(0, 0, w, bound_unsigned(0, h, w));
+    g_aspect_scale_x = 1.0;
+    g_aspect_scale_y = w / (float)h;
   }
 }
 

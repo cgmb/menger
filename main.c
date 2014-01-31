@@ -5,7 +5,7 @@
 #include <string.h>
 #include <GL/glut.h>
 
-float cube_vbuffer[] = {
+float g_cube_vbuffer[] = {
   -0.5, -0.5,  0.5, // 0 back top left
    0.5, -0.5,  0.5, // 1 back top right
    0.5,  0.5,  0.5, // 2 back bottom right
@@ -16,7 +16,7 @@ float cube_vbuffer[] = {
   -0.5,  0.5, -0.5, // 7 front bottom left
 };
 
-size_t cube_ibuffer[] = {
+size_t g_cube_ibuffer[] = {
   0, 1, 2, 0, 2, 3, // back
   5, 1, 0, 4, 5, 0, // top
   7, 4, 0, 3, 7, 0, // left
@@ -25,11 +25,11 @@ size_t cube_ibuffer[] = {
   6, 5, 4, 7, 6, 4, // front
 };
 
-size_t cube_ibuffer_size
-  = sizeof(cube_ibuffer)/sizeof(cube_ibuffer[0]);
+size_t g_cube_ibuffer_size
+  = sizeof(g_cube_ibuffer)/sizeof(g_cube_ibuffer[0]);
 
-size_t* square_ibuffer = cube_ibuffer + 0;
-size_t square_ibuffer_size = 6;
+size_t* g_square_ibuffer = g_cube_ibuffer + 0;
+size_t g_square_ibuffer_size = 6;
 
 // lookup a vertex within the given float buffer
 float* vertex3f(float* buffer, size_t index) {
@@ -44,12 +44,12 @@ float normal_scale(int value, int offset, int steps) {
 void draw_cube() {
   glBegin(GL_TRIANGLES);
   size_t i;
-  for (i = 0; i < cube_ibuffer_size; ++i) {
+  for (i = 0; i < g_cube_ibuffer_size; ++i) {
     glColor3f(
       normal_scale(i/6, 0, 6),
       normal_scale(i/6, 2, 6),
       normal_scale(i/6, 4, 6));
-    glVertex3fv(vertex3f(cube_vbuffer, cube_ibuffer[i]));
+    glVertex3fv(vertex3f(g_cube_vbuffer, g_cube_ibuffer[i]));
   }
   glEnd();
 }
@@ -177,13 +177,6 @@ void setup_world_camera() {
   glScalef(g_perm_camera_scale, g_perm_camera_scale, g_perm_camera_scale);
 }
 
-void teardown_world_camera() {
-  glScalef(1/g_perm_camera_scale, 1/g_perm_camera_scale, 1/g_perm_camera_scale);
-  glScalef(1/g_temp_camera_scale, 1/g_temp_camera_scale, 1/g_temp_camera_scale);
-  glRotatef(-g_camera_rotation_y, 1, 0, 0);
-  glRotatef(-g_camera_rotation_x, 0, 1, 0);
-}
-
 unsigned g_recurse_depth = 1;
 
 typedef void(*button_fn)();
@@ -191,9 +184,9 @@ typedef void(*button_fn)();
 void draw_button(float r, float g, float b) {
   glBegin(GL_TRIANGLES);
   size_t i;
-  for (i = 0; i < square_ibuffer_size; ++i) {
+  for (i = 0; i < g_square_ibuffer_size; ++i) {
     glColor3f(r, g, b);
-    glVertex3fv(vertex3f(cube_vbuffer, square_ibuffer[i]));
+    glVertex3fv(vertex3f(g_cube_vbuffer, g_square_ibuffer[i]));
   }
   glEnd();
 }
@@ -237,7 +230,7 @@ void reset_to_ortho() {
 
 void setup_initial_transform() {
   reset_to_ortho();
-  glTranslatef(0.5, 0.5, 0.5);
+  glTranslatef(0.5/g_aspect_scale_x, 0.5/g_aspect_scale_y, 0.5);
   glScalef(1.0/16.0, 1.0/16.0, 1.0/16.0);
   glRotatef(30.0, 1.0, 1.0, 1.0);
 }
@@ -249,7 +242,6 @@ void display() {
 
   setup_world_camera();
   draw_menger_sponge(g_recurse_depth);
-  teardown_world_camera();
 
   reset_to_ortho();
   draw_buttons();

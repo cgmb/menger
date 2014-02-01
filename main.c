@@ -222,14 +222,24 @@ void draw_buttons() {
 float g_aspect_scale_x = 1.0;
 float g_aspect_scale_y = 1.0;
 
-void reset_to_ortho() {
+typedef enum { ORTHO, PERSPECTIVE } proj_t;
+proj_t g_main_proj = ORTHO;
+
+void reset_to(proj_t proj) {
   glLoadIdentity();
-  glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
+  if (proj == ORTHO) {
+    glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
+  } else {
+    // because the depth buffer uses a logorithmic scale
+    // bad things happen when the frustum crosses z=0
+    glFrustum(0.0, 1.0, 0.0, 1.0, 10.0, 100.0);
+    glTranslatef(0, 0, -11.0);
+  }
   glScalef(g_aspect_scale_x, g_aspect_scale_y, 1.0);
 }
 
 void setup_initial_transform() {
-  reset_to_ortho();
+  reset_to(g_main_proj);
   glTranslatef(0.5/g_aspect_scale_x, 0.5/g_aspect_scale_y, 0.5);
   glScalef(1.0/16.0, 1.0/16.0, 1.0/16.0);
   glRotatef(30.0, 1.0, 1.0, 1.0);
@@ -243,7 +253,7 @@ void display() {
   setup_world_camera();
   draw_menger_sponge(g_recurse_depth);
 
-  reset_to_ortho();
+  reset_to(ORTHO);
   draw_buttons();
 
   glutSwapBuffers();
@@ -305,6 +315,7 @@ enum {
   NORMAL = 27, // esc
   SCALE_ENTRY = 's',
   RECURSE_ENTRY = 'r',
+  PROJECTION_ENTRY = 'p',
   QUIT_COMMAND = 'q',
   ENTER_COMMAND = 13, // enter
 };
@@ -360,11 +371,32 @@ void key_press(unsigned char key, int x, int y) {
         fflush(stdout);
       }
       break;
+    case PROJECTION_ENTRY:
+      if (key == 'o') {
+        g_main_proj = ORTHO;
+        glutPostRedisplay();
+        printf("%c\n", key);
+      } else if (key == 'p') {
+        g_main_proj = PERSPECTIVE;
+        glutPostRedisplay();
+        printf("%c\n", key);
+      } else if (key == 27) {
+        g_command_state = NORMAL;
+        printf(" - cancelled\n");
+      } else {
+        printf("\nunknown projection\n");
+        printf("known projections are:\n"
+          "  o - orthographic\n"
+          "  p - perspective\n");
+      }
+      g_command_state = NORMAL;
+      break;
     default: // enter state
       g_command_state = key;
       switch(g_command_state) {
         case SCALE_ENTRY:
         case RECURSE_ENTRY:
+        case PROJECTION_ENTRY:
           memset(g_arg_text, 0, MAX_ARG_LENGTH);
           g_arg_text_i = 0;
           printf("%c:", key);
@@ -379,6 +411,7 @@ void key_press(unsigned char key, int x, int y) {
           printf("known commands are:\n"
             "  s - scale\n"
             "  r - recursion depth [0,%u]\n"
+            "  p - perspective {o,p}\n"
             "  q - fast quit\n", MAX_DEPTH);
       }
   }

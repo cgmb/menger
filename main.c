@@ -349,16 +349,20 @@ void teardown_light() {
   }
 }
 
+unsigned g_skip_sponge_redraw = 0;
+
 void display() {
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  if (g_skip_sponge_redraw) {
+    --g_skip_sponge_redraw;
+  } else {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-  setup_initial_transform();
-
-  setup_world_camera();
-  setup_light();
-  draw_menger_sponge(g_recurse_depth);
-  teardown_light();
-
+    setup_initial_transform();
+    setup_world_camera();
+    setup_light();
+    draw_menger_sponge(g_recurse_depth);
+    teardown_light();
+  }
   reset_to(ORTHO);
   draw_buttons();
 
@@ -396,6 +400,8 @@ void mouse_press(int button, int state, int x, int y) {
   if (state == GLUT_DOWN) {
     g_pressed_button = button_index_from_xy(x, y);
     if (g_button_callbacks[g_pressed_button]) {
+      // the sponge hasn't changed
+      g_skip_sponge_redraw += 1;
       glutPostRedisplay();
     } else {
       g_last_x = x;

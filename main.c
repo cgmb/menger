@@ -28,6 +28,8 @@ size_t g_cube_ibuffer[] = {
 size_t g_cube_ibuffer_size
   = sizeof(g_cube_ibuffer)/sizeof(g_cube_ibuffer[0]);
 
+float g_cube_normal_buffer[36];
+
 size_t* g_square_ibuffer = g_cube_ibuffer + 0;
 size_t g_square_ibuffer_size = 6;
 
@@ -41,10 +43,55 @@ float normal_scale(int value, int offset, int steps) {
   return ((value + offset) % steps) / (float)steps;
 }
 
+void cross_product_3fo(const float* x, const float* y, float* result) {
+  result[0] = x[1]*y[2] - x[2]*y[1];
+  result[1] = x[2]*y[0] - x[0]*y[2];
+  result[2] = x[0]*y[1] - x[1]*y[0];
+}
+
+float magnitude_3f(const float* x) {
+  return sqrt(x[0]*x[0] + x[1]*x[1] + x[2]*x[2]);
+}
+
+void scale_3f(float scalar, float* x) {
+  x[0] *= scalar;
+  x[1] *= scalar;
+  x[2] *= scalar;
+}
+
+void difference_3fo(const float* x, const float* y, float* result) {
+  result[0] = x[0] - y[0];
+  result[1] = x[1] - y[1];
+  result[2] = x[2] - y[2];
+}
+
+void normalize_3f(float* x) {
+  float magnitude = magnitude_3f(x);
+  if (magnitude == 0.f) {
+    return; // not really sure what to do about this...
+  }
+  scale_3f(1/magnitude, x);
+}
+
+void triangle_normal_3fo(
+const float* a, const float* b, const float* c, float* result) {
+  float ab[3];
+  difference_3fo(b, a, ab);
+  float ca[3];
+  difference_3fo(a, c, ca);
+  cross_product_3fo(ab, ca, result);
+  normalize_3f(result);
+}
+
+int g_use_lighting = 0;
+
 void draw_cube() {
   glBegin(GL_TRIANGLES);
   size_t i;
   for (i = 0; i < g_cube_ibuffer_size; ++i) {
+    if (g_use_lighting) {
+      glNormal3fv(vertex3f(g_cube_normal_buffer, i/3u));
+    }
     glColor3f(
       normal_scale(i/6, 0, 6),
       normal_scale(i/6, 2, 6),
@@ -267,13 +314,50 @@ void setup_initial_transform() {
   glRotatef(30.0, 1.0, 1.0, 1.0);
 }
 
+void init_light() {
+  float position[] = { 1, 1, 1, 0 };
+  glLightfv(GL_LIGHT0, GL_POSITION, position);
+  float ambient_color[] = { 0.125, 0.125, 0.125, 1 };
+  glLightfv(GL_LIGHT0, GL_AMBIENT, ambient_color);
+  float diffuse_color[] = { 1, 1, 1, 1 };
+  glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse_color);
+  float specular_color[] = { 0.75, 0.75, 0.75, 1 };
+  glLightfv(GL_LIGHT0, GL_SPECULAR, specular_color);
+}
+
+void init_material() {
+  glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+  float specular_color[] = { 0.75, 0.75, 0.75, 1 };
+  glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, specular_color);
+  float emission_color[] = { 0, 0, 0, 1 };
+  glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, emission_color);
+}
+
+void setup_light() {
+  if (g_use_lighting) {
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_COLOR_MATERIAL);
+  }
+}
+
+void teardown_light() {
+  if (g_use_lighting) {
+    glDisable(GL_LIGHT0);
+    glDisable(GL_LIGHTING);
+    glDisable(GL_COLOR_MATERIAL);
+  }
+}
+
 void display() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   setup_initial_transform();
 
   setup_world_camera();
+  setup_light();
   draw_menger_sponge(g_recurse_depth);
+  teardown_light();
 
   reset_to(ORTHO);
   draw_buttons();
@@ -286,6 +370,9 @@ void init() {
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_CULL_FACE);
   glMatrixMode(GL_PROJECTION);
+
+  init_light();
+  init_material();
 }
 
 int g_rotating = 0;
@@ -356,6 +443,7 @@ void mouse_move(int x, int y) {
 
 enum {
   NORMAL = 27, // esc
+  LIGHT_ENTRY = 'l',
   SCALE_ENTRY = 's',
   RECURSE_ENTRY = 'r',
   PROJECTION_ENTRY = 'p',
@@ -379,7 +467,7 @@ void key_press(unsigned char key, int x, int y) {
           g_perm_camera_scale = 1/number;
           glutPostRedisplay();
         } else {
-           printf("\ninvalid scale");
+          printf("\nInvalid scale");
         }
         g_command_state = NORMAL;
         printf("\n");
@@ -401,7 +489,7 @@ void key_press(unsigned char key, int x, int y) {
           g_recurse_depth = (unsigned)number;
           glutPostRedisplay();
         } else {
-           printf("\ninvalid recursive depth");
+          printf("\nInvalid recursive depth");
         }
         g_command_state = NORMAL;
         printf("\n");
@@ -424,13 +512,31 @@ void key_press(unsigned char key, int x, int y) {
         glutPostRedisplay();
         printf("%c\n", key);
       } else if (key == 27) {
-        g_command_state = NORMAL;
         printf(" - cancelled\n");
       } else {
-        printf("\nunknown projection\n");
-        printf("known projections are:\n"
+        printf("\nUnknown projection\n");
+        printf("Known projections are:\n"
           "  o - orthographic\n"
           "  p - perspective\n");
+      }
+      g_command_state = NORMAL;
+      break;
+    case LIGHT_ENTRY:
+      if (key == '0') {
+        g_use_lighting = 0;
+        glutPostRedisplay();
+        printf("%c\n", key);
+      } else if (key == '1') {
+        g_use_lighting = 1;
+        glutPostRedisplay();
+        printf("%c\n", key);
+      } else if (key == 27) {
+        printf(" - cancelled\n");
+      } else {
+        printf("\nUnknown light state\n");
+        printf("Known states are:\n"
+          "  0 - off\n"
+          "  1 - on\n");
       }
       g_command_state = NORMAL;
       break;
@@ -440,6 +546,7 @@ void key_press(unsigned char key, int x, int y) {
         case SCALE_ENTRY:
         case RECURSE_ENTRY:
         case PROJECTION_ENTRY:
+        case LIGHT_ENTRY:
           memset(g_arg_text, 0, MAX_ARG_LENGTH);
           g_arg_text_i = 0;
           printf("%c:", key);
@@ -450,8 +557,9 @@ void key_press(unsigned char key, int x, int y) {
         case NORMAL:
           break;
         default:
-	  printf("unknown command: %c\n", key);
-          printf("known commands are:\n"
+          printf("Unknown command: %c\n", key);
+          printf("Known commands are:\n"
+            "  l - lighting {0,1}\n"
             "  s - scale\n"
             "  r - recursion depth [0,%u]\n"
             "  p - perspective {o,p}\n"
@@ -522,6 +630,11 @@ void set_projection_perspective() {
   glutPostRedisplay();
 }
 
+void toggle_use_lighting() {
+  g_use_lighting = g_use_lighting ? 0 : 1;
+  glutPostRedisplay();
+}
+
 void setup_callbacks() {
   g_button_callbacks[0] = set_recursive_depth_0;
   g_button_callbacks[1] = set_recursive_depth_1;
@@ -532,6 +645,17 @@ void setup_callbacks() {
   g_button_callbacks[18] = set_scale_5;
   g_button_callbacks[32] = set_projection_ortho;
   g_button_callbacks[33] = set_projection_perspective;
+  g_button_callbacks[48] = toggle_use_lighting;
+}
+
+void calculate_normals() {
+  size_t i;
+  for (i = 0; i < g_cube_ibuffer_size; i += 3) {
+    float* a = vertex3f(g_cube_vbuffer, g_cube_ibuffer[i]);
+    float* b = vertex3f(g_cube_vbuffer, g_cube_ibuffer[i + 1]);
+    float* c = vertex3f(g_cube_vbuffer, g_cube_ibuffer[i + 2]);
+    triangle_normal_3fo(a, b, c, g_cube_normal_buffer + i);
+  }
 }
 
 int main(int argc, char** argv) {
@@ -542,6 +666,7 @@ int main(int argc, char** argv) {
   glutCreateWindow ("C Menger Sponge");
   init();
   setup_callbacks();
+  calculate_normals();
   display();
   glutDisplayFunc(display);
   glutReshapeFunc(reshape);

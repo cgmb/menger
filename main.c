@@ -495,11 +495,43 @@ void set_recursive_depth_3() {
   set_recursive_depth(3);
 }
 
+void set_scale(float s) {
+  g_perm_camera_scale = s;
+  glutPostRedisplay();
+}
+
+void set_scale_1() {
+  set_scale(1.0/1);
+}
+
+void set_scale_2() {
+  set_scale(1.0/2);
+}
+
+void set_scale_5() {
+  set_scale(1.0/5);
+}
+
+void set_projection_ortho() {
+  g_main_proj = ORTHO;
+  glutPostRedisplay();
+}
+
+void set_projection_perspective() {
+  g_main_proj = PERSPECTIVE;
+  glutPostRedisplay();
+}
+
 void setup_callbacks() {
   g_button_callbacks[0] = set_recursive_depth_0;
   g_button_callbacks[1] = set_recursive_depth_1;
   g_button_callbacks[2] = set_recursive_depth_2;
   g_button_callbacks[3] = set_recursive_depth_3;
+  g_button_callbacks[16] = set_scale_1;
+  g_button_callbacks[17] = set_scale_2;
+  g_button_callbacks[18] = set_scale_5;
+  g_button_callbacks[32] = set_projection_ortho;
+  g_button_callbacks[33] = set_projection_perspective;
 }
 
 int main(int argc, char** argv) {

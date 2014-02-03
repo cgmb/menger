@@ -180,6 +180,10 @@ void setup_world_camera() {
 unsigned g_recurse_depth = 1;
 
 typedef void(*button_fn)();
+enum { CALLBACK_COUNT = 256 };
+// we can afford wasting a few kiB of memory for this
+button_fn g_button_callbacks[CALLBACK_COUNT + 1] = {};
+size_t g_pressed_button = CALLBACK_COUNT;
 
 void draw_button(float r, float g, float b) {
   glBegin(GL_TRIANGLES);
@@ -191,32 +195,50 @@ void draw_button(float r, float g, float b) {
   glEnd();
 }
 
+void draw_pressed_button(float r, float g, float b) {
+  draw_button(r, g, b);
+  glScalef(15.0/16, 15.0/16, 0);
+  glTranslatef(0, 0, -0.25);
+  draw_button(0.5*r, 0.5*g, 0.5*b);
+  glScalef(16.0/15, 16.0/15, 0);
+  glTranslatef(0, 0, 0.25);
+}
+
+void draw_button_at(size_t index, float r, float g, float b) {
+  float x = index / 16;
+  float y = index % 16;
+  glTranslatef(x, y, 0);
+
+  if (index == g_pressed_button) {
+    draw_pressed_button(r, g, b);
+  } else {
+    draw_button(r, g, b);
+  }
+
+  glTranslatef(-x, -y, 0);
+}
+
 void draw_buttons() {
+  glDisable(GL_DEPTH_TEST);
+
   glScalef(1.0/16, 1.0/16, 1.0/16);
   glTranslatef(1.0/2, 1.0/2, 0);
 
-  draw_button(1, 1, 1);
-  glTranslatef(0, 1, 0);
-  draw_button(0, 1, 1);
-  glTranslatef(0, 1, 0);
-  draw_button(1, 0, 1);
-  glTranslatef(0, 1, 0);
-  draw_button(1, 1, 0);
+  draw_button_at(0, 1, 1, 1);
+  draw_button_at(1, 0, 1, 1);
+  draw_button_at(2, 1, 0, 1);
+  draw_button_at(3, 1, 1, 0);
 
-  glTranslatef(1, -3, 0);
-  draw_button(1, 0, 0);
-  glTranslatef(0, 1, 0);
-  draw_button(0, 1, 0);
-  glTranslatef(0, 1, 0);
-  draw_button(0, 0, 1);
+  draw_button_at(16, 1, 0, 0);
+  draw_button_at(17, 0, 1, 0);
+  draw_button_at(18, 0, 0, 1);
 
-  glTranslatef(1, -2, 0);
-  draw_button(0.5, 0.5, 0.5);
-  glTranslatef(0, 1, 0);
-  draw_button(0.5, 0.0, 0.5);
+  draw_button_at(32, 0.5, 0.5, 0.5);
+  draw_button_at(33, 0.5, 0.0, 0.5);
 
-  glTranslatef(1, -1, 0);
-  draw_button(0.0, 0.5, 0.5);
+  draw_button_at(48, 0.0, 0.5, 0.5);
+
+  glEnable(GL_DEPTH_TEST);
 }
 
 float g_aspect_scale_x = 1.0;
@@ -274,20 +296,41 @@ int g_last_y = 0;
 int g_window_size_x = 480;
 int g_window_size_y = 480;
 
+size_t button_index_from_xy(int x, int y) {
+  int reverse_y = g_window_size_y - y;
+  size_t index =
+    16u * (x / (int)(g_window_size_x * g_aspect_scale_x/16)) +
+    (reverse_y / (int)(g_window_size_y * g_aspect_scale_y/16));
+  // just in case...
+  return bound_unsigned(0, index, CALLBACK_COUNT - 1);
+}
+
 void mouse_press(int button, int state, int x, int y) {
   if (state == GLUT_DOWN) {
-    g_last_x = x;
-    g_last_y = y;
-    if (button == GLUT_LEFT_BUTTON) {
-      g_rotating = 1;
-    } else if (button == GLUT_RIGHT_BUTTON) {
-      g_scaling = 1;
+    g_pressed_button = button_index_from_xy(x, y);
+    if (g_button_callbacks[g_pressed_button]) {
+      glutPostRedisplay();
+    } else {
+      g_last_x = x;
+      g_last_y = y;
+      if (button == GLUT_LEFT_BUTTON) {
+        g_rotating = 1;
+      } else if (button == GLUT_RIGHT_BUTTON) {
+        g_scaling = 1;
+      }
     }
   } else if (state == GLUT_UP) {
-    g_rotating = 0;
-    g_scaling = 0;
-    g_perm_camera_scale *= g_temp_camera_scale;
-    g_temp_camera_scale = 1.0;
+    button_fn callback = g_button_callbacks[g_pressed_button];
+    g_pressed_button = CALLBACK_COUNT;
+    if (callback) {
+      glutPostRedisplay();
+      callback();
+    } else {
+      g_rotating = 0;
+      g_scaling = 0;
+      g_perm_camera_scale *= g_temp_camera_scale;
+      g_temp_camera_scale = 1.0;
+    }
   }
 }
 
@@ -426,6 +469,37 @@ void reshape(int w, int h) {
     g_aspect_scale_x = 1.0;
     g_aspect_scale_y = w / (float)h;
   }
+  g_window_size_x = w;
+  g_window_size_y = h;
+}
+
+void set_recursive_depth(unsigned depth) {
+  g_recurse_depth = depth;
+  g_perm_camera_scale = 3.0 / power_fu(3.0, g_recurse_depth);
+  glutPostRedisplay();
+}
+
+void set_recursive_depth_0() {
+  set_recursive_depth(0);
+}
+
+void set_recursive_depth_1() {
+  set_recursive_depth(1);
+}
+
+void set_recursive_depth_2() {
+  set_recursive_depth(2);
+}
+
+void set_recursive_depth_3() {
+  set_recursive_depth(3);
+}
+
+void setup_callbacks() {
+  g_button_callbacks[0] = set_recursive_depth_0;
+  g_button_callbacks[1] = set_recursive_depth_1;
+  g_button_callbacks[2] = set_recursive_depth_2;
+  g_button_callbacks[3] = set_recursive_depth_3;
 }
 
 int main(int argc, char** argv) {
@@ -435,6 +509,7 @@ int main(int argc, char** argv) {
   glutInitWindowPosition(100, 100);
   glutCreateWindow ("C Menger Sponge");
   init();
+  setup_callbacks();
   display();
   glutDisplayFunc(display);
   glutReshapeFunc(reshape);

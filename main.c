@@ -5,7 +5,7 @@
 #include <string.h>
 #include <GL/glut.h>
 
-float g_cube_vbuffer[] = {
+const float g_cube_vbuffer[] = {
   -0.5, -0.5,  0.5, // 0 back top left
    0.5, -0.5,  0.5, // 1 back top right
    0.5,  0.5,  0.5, // 2 back bottom right
@@ -16,7 +16,7 @@ float g_cube_vbuffer[] = {
   -0.5,  0.5, -0.5, // 7 front bottom left
 };
 
-size_t g_cube_ibuffer[] = {
+const size_t g_cube_ibuffer[] = {
   0, 1, 2, 0, 2, 3, // back
   5, 1, 0, 4, 5, 0, // top
   7, 4, 0, 3, 7, 0, // left
@@ -25,16 +25,16 @@ size_t g_cube_ibuffer[] = {
   6, 5, 4, 7, 6, 4, // front
 };
 
-size_t g_cube_ibuffer_size
+const size_t g_cube_ibuffer_size
   = sizeof(g_cube_ibuffer)/sizeof(g_cube_ibuffer[0]);
 
 float g_cube_normal_buffer[36];
 
-size_t* g_square_ibuffer = g_cube_ibuffer + 0;
-size_t g_square_ibuffer_size = 6;
+const size_t* g_square_ibuffer = g_cube_ibuffer + 0;
+const size_t g_square_ibuffer_size = 6;
 
 // lookup a vertex within the given float buffer
-float* vertex3f(float* buffer, size_t index) {
+const float* vertex3f(const float* buffer, size_t index) {
   return buffer + (3u * index);
 }
 
@@ -171,8 +171,6 @@ void draw_unit() {
   draw_pattern(draw_cube, 1);
 }
 
-const unsigned MAX_DEPTH = 6u;
-
 unsigned bound_unsigned(unsigned min, unsigned value, unsigned max) {
   if (value > max) {
     value = max;
@@ -182,17 +180,13 @@ unsigned bound_unsigned(unsigned min, unsigned value, unsigned max) {
   return value;
 }
 
-float power_fu(float x, unsigned y) {
-  float value = 1.0;
-  unsigned i;
-  for (i = 0; i < y; ++i) {
-    value *= x;
-  }
-  return value;
-}
-
 // global state for draw_pattern_recursive
 unsigned g_current_depth;
+
+enum { MAX_DEPTH = 6u };
+const float g_power_of_3[MAX_DEPTH + 1] = {
+  1, 3, 9, 27, 81, 243, 729,
+};
 
 // a tricky recursiive function used to supply draw_pattern back to itself.
 // to match the signature of draw_fn, the scale is based on g_current_depth.
@@ -200,7 +194,7 @@ void draw_pattern_recursive() {
   unsigned frame_depth = g_current_depth;
   if (frame_depth > 0u) {
     --g_current_depth;
-    draw_pattern(draw_pattern_recursive, power_fu(3.0, frame_depth));
+    draw_pattern(draw_pattern_recursive, g_power_of_3[frame_depth]);
     ++g_current_depth;
   } else {
     draw_pattern(draw_cube, 1);
@@ -589,7 +583,7 @@ void reshape(int w, int h) {
 
 void set_recursive_depth(unsigned depth) {
   g_recurse_depth = depth;
-  g_perm_camera_scale = 3.0 / power_fu(3.0, g_recurse_depth);
+  g_perm_camera_scale = 3.0 / g_power_of_3[g_recurse_depth];
   glutPostRedisplay();
 }
 
@@ -657,9 +651,9 @@ void setup_callbacks() {
 void calculate_normals() {
   size_t i;
   for (i = 0; i < g_cube_ibuffer_size; i += 3) {
-    float* a = vertex3f(g_cube_vbuffer, g_cube_ibuffer[i]);
-    float* b = vertex3f(g_cube_vbuffer, g_cube_ibuffer[i + 1]);
-    float* c = vertex3f(g_cube_vbuffer, g_cube_ibuffer[i + 2]);
+    const float* a = vertex3f(g_cube_vbuffer, g_cube_ibuffer[i]);
+    const float* b = vertex3f(g_cube_vbuffer, g_cube_ibuffer[i + 1]);
+    const float* c = vertex3f(g_cube_vbuffer, g_cube_ibuffer[i + 2]);
     triangle_normal_3fo(a, b, c, g_cube_normal_buffer + i);
   }
 }

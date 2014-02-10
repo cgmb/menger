@@ -73,13 +73,37 @@ void normalize_3f(float* x) {
   scale_3f(1/magnitude, x);
 }
 
+void matrix3_mul_3fo(const float* m, const float* v, float* result) {
+  result[0] = m[0]*v[0] + m[1]*v[1] + m[2]*v[2];
+  result[1] = m[3]*v[0] + m[4]*v[1] + m[5]*v[2];
+  result[2] = m[6]*v[0] + m[7]*v[1] + m[8]*v[2];
+}
+
+void rotatex_3fo(float rx, const float* v, float* result) {
+  float m[] = {
+    1,  0,         0,
+    0,  cosf(rx), -sinf(rx),
+    0,  sinf(rx),  cosf(rx),
+  };
+  matrix3_mul_3fo(m, v, result);
+}
+
+void rotatey_3fo(float ry, const float* v, float* result) {
+  float m[] = {
+    cosf(ry),  0,  sinf(ry),
+    0,         1,  0,
+   -sinf(ry),  0,  cosf(ry),
+  };
+  matrix3_mul_3fo(m, v, result);
+}
+
 void triangle_normal_3fo(
 const float* a, const float* b, const float* c, float* result) {
   float ab[3];
   difference_3fo(b, a, ab);
-  float ca[3];
-  difference_3fo(a, c, ca);
-  cross_product_3fo(ab, ca, result);
+  float ac[3];
+  difference_3fo(c, a, ac);
+  cross_product_3fo(ab, ac, result);
   normalize_3f(result);
 }
 
@@ -295,8 +319,8 @@ void reset_to(proj_t proj) {
   } else {
     // because the depth buffer uses a logorithmic scale
     // bad things happen when the frustum crosses z=0
-    glFrustum(0.0, 1.0, 0.0, 1.0, 10.0, 100.0);
-    glTranslatef(0, 0, -11.0);
+    glFrustum(0.0, 1.0, 0.0, 1.0, 3.0, 50.0);
+    glTranslatef(0, 0, -4.0);
   }
   glScalef(g_aspect_scale_x, g_aspect_scale_y, 1.0);
 }
@@ -329,6 +353,15 @@ void init_material() {
 
 void setup_light() {
   if (g_use_lighting) {
+    float original_position[] = { 1, 1, 1, 0 };
+    float transformed_1[4] = {};
+    float transformed_2[4] = {};
+    float x = -g_camera_rotation_y / 180.0 * M_PI;
+    float y = -g_camera_rotation_x / 180.0 * M_PI;
+    rotatey_3fo(y, original_position, transformed_1);
+    rotatex_3fo(x, transformed_1, transformed_2);
+    glLightfv(GL_LIGHT0, GL_POSITION, transformed_2);
+
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
     glEnable(GL_COLOR_MATERIAL);
@@ -352,8 +385,9 @@ void display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     setup_initial_transform();
-    setup_world_camera();
     setup_light();
+
+    setup_world_camera();
     draw_menger_sponge(g_recurse_depth);
     teardown_light();
   }

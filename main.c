@@ -357,18 +357,20 @@ char* load_file(const char* filename, int* length) {
     goto close_exit;
   }
   long fsize = ftell(f);
-  if (fsize > (long)INT_MAX) {
+  if (fsize > INT_MAX) {
     goto close_exit;
   }
   *length = fsize;
   if (fseek(f, 0, SEEK_SET)) {
     goto close_exit;
   }
-  contents = malloc(fsize + 1L);
+  contents = malloc(fsize + 1);
   if (!contents) {
     goto close_exit;
   }
-  fread(contents, fsize, 1, f);
+  if (fread(contents, fsize, 1, f)) {
+    goto close_exit;
+  }
   contents[fsize] = '\0';
 close_exit:
   fclose(f);
@@ -379,33 +381,70 @@ exit:
 void load_shaders() {
   int vert_shader_length;
   char* vert_shader_text = load_file("basic.vert", &vert_shader_length);
-  int frag_shader_length;
-  char* frag_shader_text = load_file("basic.frag", &frag_shader_length);
+//  int frag_shader_length;
+//  char* frag_shader_text = load_file("basic.frag", &frag_shader_length);
 
-  unsigned vert_shader = glCreateShader(GL_VERTEX_SHADER);
-  unsigned frag_shader = glCreateShader(GL_FRAGMENT_SHADER);
-//  printf("size: %u\n", sizeof(GLchar));
-/*  glShaderSource(vert_shader, 1, &vert_shader_text, &vert_shader_length);
-  glShaderSource(frag_shader, 1, &frag_shader_text, &frag_shader_length);
-*/
-  glCompileShader(vert_shader);
-  glCompileShader(frag_shader);
+  GLuint vert_shader = glCreateShader(GL_VERTEX_SHADER);
+//  GLuint frag_shader = glCreateShader(GL_FRAGMENT_SHADER);
+///  printf("size: %u\n", sizeof(GLchar));
+  glShaderSource(vert_shader, 1, (const GLchar**)&vert_shader_text, &vert_shader_length);
+//  glShaderSource(frag_shader, 1, &frag_shader_text, &frag_shader_length);
 
-  printf("vert:\n%s\n\n", vert_shader_text);
-  printf("frag:\n%s\n\n", frag_shader_text);
+  (void)vert_shader;
+//  (void)frag_shader;
+
+//  glCompileShader(vert_shader);
+//  glCompileShader(frag_shader);
+
+//  printf("vert:\n%s\n\n", vert_shader_text);
+//  printf("frag:\n%s\n\n", frag_shader_text);
 
   free(vert_shader_text);
-  free(frag_shader_text);
+//  free(frag_shader_text);
 }
 
 void load_glew() {
-  GLenum err = glewInit();
-  if (GLEW_OK != err) {
-    fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+  GLenum glew_status = glewInit();
+  if (GLEW_OK != glew_status) {
+    fprintf(stderr, "Error: %s\n", glewGetErrorString(glew_status));
+    exit(2);
+  }
+  printf("GLEW version: %s\n", glewGetString(GLEW_VERSION));
+}
+
+void check_minimum_opengl_version() {
+  const char* version = (const char*)glGetString(GL_VERSION);
+  printf("OpenGL version: %s\n", version);
+  char* end;
+  long major_num = strtol(version, &end, 10);
+  if (*end == '.' && errno != EINVAL && errno != ERANGE) {
+    if (major_num > 3) {
+      // all is well
+    } else if (major_num < 3) {
+      fprintf(stderr, "Requires OpenGL 3.3\n");
+      exit(1);
+    } else {
+      long minor_num = strtol(end + 1, NULL, 10);
+      if (errno != EINVAL && errno != ERANGE) {
+        if (minor_num < 3) {
+          fprintf(stderr, "Requires OpenGL 3.3\n");
+          exit(1);
+        } else {
+          // all is well
+        }
+      } else {
+        fprintf(stderr, "OpenGL minor version parse error\n");
+        exit(1);
+      }
+    }
+  } else {
+    fprintf(stderr, "OpenGL major version parse error\n");
+    exit(1);
   }
 }
 
 void init() {
+  check_minimum_opengl_version();
   load_glew();
   load_shaders();
 

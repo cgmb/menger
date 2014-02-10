@@ -1,8 +1,10 @@
 #include <errno.h>
+#include <limits.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <GL/glew.h>
 #include <GL/glut.h>
 #include "vector_math.h"
 
@@ -344,7 +346,69 @@ void display() {
   glutSwapBuffers();
 }
 
+char* load_file(const char* filename, int* length) {
+  FILE* f = fopen(filename, "rb");
+  char* contents = NULL;
+  *length = 0;
+  if (!f) {
+    goto exit;
+  }
+  if (fseek(f, 0, SEEK_END)) {
+    goto close_exit;
+  }
+  long fsize = ftell(f);
+  if (fsize > (long)INT_MAX) {
+    goto close_exit;
+  }
+  *length = fsize;
+  if (fseek(f, 0, SEEK_SET)) {
+    goto close_exit;
+  }
+  contents = malloc(fsize + 1L);
+  if (!contents) {
+    goto close_exit;
+  }
+  fread(contents, fsize, 1, f);
+  contents[fsize] = '\0';
+close_exit:
+  fclose(f);
+exit:
+  return contents;
+}
+
+void load_shaders() {
+  int vert_shader_length;
+  char* vert_shader_text = load_file("basic.vert", &vert_shader_length);
+  int frag_shader_length;
+  char* frag_shader_text = load_file("basic.frag", &frag_shader_length);
+
+  unsigned vert_shader = glCreateShader(GL_VERTEX_SHADER);
+  unsigned frag_shader = glCreateShader(GL_FRAGMENT_SHADER);
+//  printf("size: %u\n", sizeof(GLchar));
+/*  glShaderSource(vert_shader, 1, &vert_shader_text, &vert_shader_length);
+  glShaderSource(frag_shader, 1, &frag_shader_text, &frag_shader_length);
+*/
+  glCompileShader(vert_shader);
+  glCompileShader(frag_shader);
+
+  printf("vert:\n%s\n\n", vert_shader_text);
+  printf("frag:\n%s\n\n", frag_shader_text);
+
+  free(vert_shader_text);
+  free(frag_shader_text);
+}
+
+void load_glew() {
+  GLenum err = glewInit();
+  if (GLEW_OK != err) {
+    fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+  }
+}
+
 void init() {
+  load_glew();
+  load_shaders();
+
   glClearColor(0.0, 0.0, 0.0, 0.0);
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_CULL_FACE);

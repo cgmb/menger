@@ -381,26 +381,23 @@ exit:
 void load_shaders() {
   int vert_shader_length;
   char* vert_shader_text = load_file("basic.vert", &vert_shader_length);
-//  int frag_shader_length;
-//  char* frag_shader_text = load_file("basic.frag", &frag_shader_length);
+  int frag_shader_length;
+  char* frag_shader_text = load_file("basic.frag", &frag_shader_length);
+
+//  printf("vert:\n%d: %s\n\n", vert_shader_length, vert_shader_text);
+//  printf("frag:\n%d: %s\n\n", frag_shader_length, frag_shader_text);
 
   GLuint vert_shader = glCreateShader(GL_VERTEX_SHADER);
-//  GLuint frag_shader = glCreateShader(GL_FRAGMENT_SHADER);
-///  printf("size: %u\n", sizeof(GLchar));
+  GLuint frag_shader = glCreateShader(GL_FRAGMENT_SHADER);
+
   glShaderSource(vert_shader, 1, (const GLchar**)&vert_shader_text, &vert_shader_length);
-//  glShaderSource(frag_shader, 1, &frag_shader_text, &frag_shader_length);
+  glShaderSource(frag_shader, 1, (const GLchar**)&frag_shader_text, &frag_shader_length);
 
-  (void)vert_shader;
-//  (void)frag_shader;
-
-//  glCompileShader(vert_shader);
-//  glCompileShader(frag_shader);
-
-//  printf("vert:\n%s\n\n", vert_shader_text);
-//  printf("frag:\n%s\n\n", frag_shader_text);
+  glCompileShader(vert_shader);
+  glCompileShader(frag_shader);
 
   free(vert_shader_text);
-//  free(frag_shader_text);
+  free(frag_shader_text);
 }
 
 void load_glew() {
@@ -412,34 +409,51 @@ void load_glew() {
   printf("GLEW version: %s\n", glewGetString(GLEW_VERSION));
 }
 
-void check_minimum_opengl_version() {
-  const char* version = (const char*)glGetString(GL_VERSION);
-  printf("OpenGL version: %s\n", version);
+int check_version_string(const char* name, const char* version, 
+  long major_req, long minor_req, const char* version_req) {
+  printf("%s version: %s\n", name, version);
   char* end;
   long major_num = strtol(version, &end, 10);
   if (*end == '.' && errno != EINVAL && errno != ERANGE) {
-    if (major_num > 3) {
+    if (major_num > major_req) {
       // all is well
-    } else if (major_num < 3) {
-      fprintf(stderr, "Requires OpenGL 3.3\n");
-      exit(1);
+    } else if (major_num < major_req) {
+      fprintf(stderr, "Requires %s %s\n", name, version_req);
+      return 1;
     } else {
       long minor_num = strtol(end + 1, NULL, 10);
       if (errno != EINVAL && errno != ERANGE) {
-        if (minor_num < 3) {
-          fprintf(stderr, "Requires OpenGL 3.3\n");
-          exit(1);
+        if (minor_num < minor_req) {
+          fprintf(stderr, "Requires %s %s\n", name, version_req);
+          return 1;
         } else {
           // all is well
         }
       } else {
-        fprintf(stderr, "OpenGL minor version parse error\n");
-        exit(1);
+        fprintf(stderr, "%s minor version parse error\n", name);
+        return 1;
       }
     }
   } else {
-    fprintf(stderr, "OpenGL major version parse error\n");
-    exit(1);
+    fprintf(stderr, "%s major version parse error\n", name);
+    return 1;
+  }
+  return 0;
+}
+
+#define COLOR_RED       "\x1b[31m"
+#define COLOR_RESET     "\x1b[0m"
+
+void check_minimum_opengl_version() {
+  int fail = 0;
+  fail |= check_version_string("OpenGL", 
+    (const char*)glGetString(GL_VERSION), 3, 0, "3.0");
+  fail |= check_version_string("OpenGL Shading Language", 
+    (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION), 3, 3, "3.30");
+  if (fail) {
+    fprintf(stderr, COLOR_RED 
+      "You do not meet the minimum OpenGL requirements!\n" 
+      COLOR_RESET);
   }
 }
 

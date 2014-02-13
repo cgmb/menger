@@ -8,6 +8,21 @@
 #include <GL/glut.h>
 #include "vector_math.h"
 
+#ifndef BUFFER_OFFSET
+#define BUFFER_OFFSET(i) ((char *)NULL + (i))
+#else
+#error BUFFER_OFFSET already defined!
+#endif
+
+const float mvp_matrix[] = {
+  1, 0, 0, 0,
+  0, 1, 0, 0,
+  0, 0, 0, 0,
+  0, 0, 0, 1,
+};
+
+GLuint g_mvp_id;
+
 const float g_cube_vbuffer[] = {
   -0.5, -0.5,  0.5, // 0 back top left
    0.5, -0.5,  0.5, // 1 back top right
@@ -31,7 +46,12 @@ const size_t g_cube_ibuffer[] = {
 const size_t g_cube_ibuffer_size
   = sizeof(g_cube_ibuffer)/sizeof(g_cube_ibuffer[0]);
 
+GLuint g_cube_vbuffer_id;
+GLuint g_cube_ibuffer_id;
+
 float g_cube_normal_buffer[36];
+
+GLuint g_cube_normal_buffer_id;
 
 const size_t* g_square_ibuffer = g_cube_ibuffer + 0;
 const size_t g_square_ibuffer_size = 6;
@@ -325,6 +345,8 @@ void teardown_light() {
   }
 }
 
+GLuint g_program_id;
+
 unsigned g_skip_sponge_redraw = 0;
 
 void display() {
@@ -334,11 +356,17 @@ void display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     setup_initial_transform();
-    setup_light();
+//    setup_light();
 
     setup_world_camera();
-    draw_menger_sponge(g_recurse_depth);
-    teardown_light();
+    glUseProgram(g_program_id);
+    GLboolean transpose = GL_TRUE;
+    glUniformMatrix4fv(g_mvp_id, 1, transpose, mvp_matrix);
+    glBindBuffer(GL_ARRAY_BUFFER, g_cube_vbuffer_id);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_cube_ibuffer_id);
+    glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
+//    draw_menger_sponge(g_recurse_depth);
+//    teardown_light();
   }
   reset_to(ORTHO);
   draw_buttons();
@@ -378,14 +406,46 @@ exit:
   return contents;
 }
 
+const int VERTEX_INDEX_IN_SHADER = 0;
+
+void load_buffers() {
+  glGenBuffers(1, &g_cube_vbuffer_id);
+  glBindBuffer(GL_ARRAY_BUFFER, g_cube_vbuffer_id);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(g_cube_vbuffer),
+    g_cube_vbuffer, GL_STATIC_DRAW);
+  glVertexAttribPointer(VERTEX_INDEX_IN_SHADER, 3, GL_FLOAT, GL_FALSE, 0, 0);
+  glEnableVertexAttribArray(VERTEX_INDEX_IN_SHADER);
+
+  glGenBuffers(1, &g_cube_ibuffer_id);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_cube_ibuffer_id);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(g_cube_ibuffer),
+    g_cube_ibuffer, GL_STATIC_DRAW);
+
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void compile_shader(GLuint shader_id) {
+  glCompileShader(shader_id);
+
+  GLint result = GL_FALSE;
+  int info_log_length;
+  glGetShaderiv(shader_id, GL_COMPILE_STATUS, &result);
+  glGetShaderiv(shader_id, GL_INFO_LOG_LENGTH, &info_log_length);
+  if (result == GL_FALSE) {
+    char* error_message = malloc(info_log_length + 1);
+    error_message[info_log_length] = '\0';
+    glGetShaderInfoLog(shader_id, info_log_length, NULL, error_message);
+    fprintf(stderr, "%s\n", error_message);
+    free(error_message);
+  }
+}
+
 void load_shaders() {
   int vert_shader_length;
   char* vert_shader_text = load_file("basic.vert", &vert_shader_length);
   int frag_shader_length;
   char* frag_shader_text = load_file("basic.frag", &frag_shader_length);
-
-//  printf("vert:\n%d: %s\n\n", vert_shader_length, vert_shader_text);
-//  printf("frag:\n%d: %s\n\n", frag_shader_length, frag_shader_text);
 
   GLuint vert_shader = glCreateShader(GL_VERTEX_SHADER);
   GLuint frag_shader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -393,11 +453,33 @@ void load_shaders() {
   glShaderSource(vert_shader, 1, (const GLchar**)&vert_shader_text, &vert_shader_length);
   glShaderSource(frag_shader, 1, (const GLchar**)&frag_shader_text, &frag_shader_length);
 
-  glCompileShader(vert_shader);
-  glCompileShader(frag_shader);
+  compile_shader(vert_shader);
+  compile_shader(frag_shader);
+
+  // Link the program
+  GLuint program = glCreateProgram();
+  glAttachShader(program, vert_shader);
+  glAttachShader(program, frag_shader);
+  glLinkProgram(program);
+
+  // Check the program
+  GLint result = GL_FALSE;
+  int info_log_length;
+  glGetProgramiv(program, GL_LINK_STATUS, &result);
+  glGetProgramiv(program, GL_INFO_LOG_LENGTH, &info_log_length);
+  char* error_message = malloc(info_log_length + 1);
+  error_message[info_log_length] = '\0';
+  glGetProgramInfoLog(program, info_log_length, NULL, error_message);
+  fprintf(stderr, "%s\n", error_message);
+  free(error_message);
+ 
+  glDeleteShader(vert_shader);
+  glDeleteShader(frag_shader);
 
   free(vert_shader_text);
   free(frag_shader_text);
+
+  g_program_id = program;
 }
 
 void load_glew() {
@@ -449,7 +531,7 @@ void check_minimum_opengl_version() {
   fail |= check_version_string("OpenGL", 
     (const char*)glGetString(GL_VERSION), 3, 0, "3.0");
   fail |= check_version_string("OpenGL Shading Language", 
-    (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION), 3, 3, "3.30");
+    (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION), 1, 3, "1.30");
   if (fail) {
     fprintf(stderr, COLOR_RED 
       "You do not meet the minimum OpenGL requirements!\n" 
@@ -461,6 +543,9 @@ void init() {
   check_minimum_opengl_version();
   load_glew();
   load_shaders();
+  load_buffers();
+
+  g_mvp_id = glGetUniformLocation(g_program_id, "mvp");
 
   glClearColor(0.0, 0.0, 0.0, 0.0);
   glEnable(GL_DEPTH_TEST);

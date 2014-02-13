@@ -395,15 +395,22 @@ proj_t g_main_proj = ORTHO;
 
 void reset_to(proj_t proj) {
   glLoadIdentity();
+  m4f_copy_m4fo(g_identity, g_proj);
   if (proj == ORTHO) {
 //    glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
   } else {
+    float perspective[] = {
+      1, 0, 0,       0,
+      0, 1, 0,       0,
+      0, 0, 1,       0,
+      0, 0, 1.0/2.0, 1,
+    };
+    m4f_copy_m4fo(perspective, g_proj);
     // because the depth buffer uses a logorithmic scale
     // bad things happen when the frustum crosses z=0
 //    glFrustum(0.0, 1.0, 0.0, 1.0, 3.0, 50.0);
 //    glTranslatef(0, 0, -4.0);
   }
-  m4f_copy_m4fo(g_identity, g_proj);
   float scale[16];
   m4f_fill_scale_m4fo(g_aspect_scale_x, g_aspect_scale_y, 1.0, scale);
   m4f_mul_m4f(scale, g_proj);

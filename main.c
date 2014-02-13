@@ -14,14 +14,79 @@
 #error BUFFER_OFFSET already defined!
 #endif
 
-const float mvp_matrix[] = {
+const float g_ortho[] = {
   1, 0, 0, 0,
   0, 1, 0, 0,
   0, 0, 0, 0,
   0, 0, 0, 1,
 };
 
+const float g_identity[] = {
+  1, 0, 0, 0,
+  0, 1, 0, 0,
+  0, 0, 1, 0,
+  0, 0, 0, 1,
+};
+
+float g_proj[16];
+float g_view[16];
+float g_mvp_matrix[16];
+
+void m4f_print(const float* m) {
+  printf("[% f % f % f % f]\n"
+         "[% f % f % f % f]\n"
+         "[% f % f % f % f]\n"
+         "[% f % f % f % f]\n", 
+    m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7],
+    m[8], m[9], m[10], m[11], m[12], m[13], m[14], m[15]);
+}
+
 GLuint g_mvp_id;
+GLuint g_color_id;
+
+const float g_slow_cube_vbuffer[] = {
+  -0.5, -0.5,  0.5, // 0
+   0.5, -0.5,  0.5, // 1
+   0.5,  0.5,  0.5, // 2
+  -0.5, -0.5,  0.5, // 0
+   0.5,  0.5,  0.5, // 2
+  -0.5,  0.5,  0.5, // 3
+
+   0.5, -0.5, -0.5, // 5
+   0.5, -0.5,  0.5, // 1
+  -0.5, -0.5,  0.5, // 0
+  -0.5, -0.5, -0.5, // 4
+   0.5, -0.5, -0.5, // 5
+  -0.5, -0.5,  0.5, // 0
+
+  -0.5,  0.5, -0.5, // 7
+  -0.5, -0.5, -0.5, // 4
+  -0.5, -0.5,  0.5, // 0
+  -0.5,  0.5,  0.5, // 3
+  -0.5,  0.5, -0.5, // 7
+  -0.5, -0.5,  0.5, // 0
+
+   0.5, -0.5,  0.5, // 1
+   0.5, -0.5, -0.5, // 5
+   0.5,  0.5, -0.5, // 6
+   0.5, -0.5,  0.5, // 1
+   0.5,  0.5, -0.5, // 6
+   0.5,  0.5,  0.5, // 2
+
+  -0.5,  0.5,  0.5, // 3
+   0.5,  0.5,  0.5, // 2
+   0.5,  0.5, -0.5, // 6
+  -0.5,  0.5,  0.5, // 3
+   0.5,  0.5, -0.5, // 6
+  -0.5,  0.5, -0.5, // 7
+
+   0.5,  0.5, -0.5, // 6
+   0.5, -0.5, -0.5, // 5
+  -0.5, -0.5, -0.5, // 4
+  -0.5,  0.5, -0.5, // 7
+   0.5,  0.5, -0.5, // 6
+  -0.5, -0.5, -0.5, // 4
+};
 
 const float g_cube_vbuffer[] = {
   -0.5, -0.5,  0.5, // 0 back top left
@@ -79,7 +144,23 @@ const float* a, const float* b, const float* c, float* result) {
 int g_use_lighting = 0;
 
 void draw_cube() {
-  glBegin(GL_TRIANGLES);
+    glUniform4f(g_color_id, 1.0, 1.0, 1.0, 1.0);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glUniform4f(g_color_id, 0.0, 1.0, 1.0, 1.0);
+    glDrawArrays(GL_TRIANGLES, 6, 6);
+    glUniform4f(g_color_id, 1.0, 0.0, 1.0, 1.0);
+    glDrawArrays(GL_TRIANGLES, 12, 6);
+    glUniform4f(g_color_id, 1.0, 1.0, 0.0, 1.0);
+    glDrawArrays(GL_TRIANGLES, 18, 6);
+    glUniform4f(g_color_id, 0.0, 0.0, 1.0, 1.0);
+    glDrawArrays(GL_TRIANGLES, 24, 6);
+    glUniform4f(g_color_id, 0.0, 1.0, 0.0, 1.0);
+    glDrawArrays(GL_TRIANGLES, 30, 6);
+    glUniform4f(g_color_id, 1.0, 0.0, 0.0, 1.0);
+    glDrawArrays(GL_TRIANGLES, 36, 6);
+    glUniform4f(g_color_id, 0.25, 0.25, 0.25, 1.0);
+    glDrawArrays(GL_TRIANGLES, 42, 6);
+/*  glBegin(GL_TRIANGLES);
   size_t i;
   for (i = 0; i < g_cube_ibuffer_size; ++i) {
     if (g_use_lighting) {
@@ -91,73 +172,84 @@ void draw_cube() {
       normal_scale(i/6, 4, 6));
     glVertex3fv(vertex3f(g_cube_vbuffer, g_cube_ibuffer[i]));
   }
-  glEnd();
+  glEnd();*/
 }
 
 typedef void(*draw_fn)();
+
+void evil_translate(float x, float y, float z) {
+  float m[16];
+  m4f_fill_trans_m4fo(x, y, z, m);
+
+  float evil[16];
+  m4f_mul_m4fo(g_mvp_matrix, m, evil);
+  m4f_copy_m4fo(evil, g_mvp_matrix);
+  
+  glUniformMatrix4fv(g_mvp_id, 1, GL_TRUE, g_mvp_matrix);
+}
 
 // draws the Menger sponge pattern using blocks drawn
 // by the draw function. The size of each block is
 // specified by s.
 void draw_pattern(draw_fn draw, float s) {
   // move to bottom corner and draw ring
-  glTranslatef(-s, -s, -s);
+  evil_translate(-s, -s, -s);
   draw();
-  glTranslatef(s, 0, 0);
+  evil_translate(s, 0, 0);
   draw();
-  glTranslatef(s, 0, 0);
+  evil_translate(s, 0, 0);
   draw();
-  glTranslatef(0, s, 0);
+  evil_translate(0, s, 0);
   draw();
-  glTranslatef(0, s, 0);
+  evil_translate(0, s, 0);
   draw();
-  glTranslatef(-s, 0, 0);
+  evil_translate(-s, 0, 0);
   draw();
-  glTranslatef(-s, 0, 0);
+  evil_translate(-s, 0, 0);
   draw();
-  glTranslatef(0, -s, 0);
+  evil_translate(0, -s, 0);
   draw();
 
   // move to next row and draw ring with holes
-  glTranslatef(0, -s, s);
+  evil_translate(0, -s, s);
   draw();
 
-  glTranslatef(s, 0, 0);
+  evil_translate(s, 0, 0);
 //  draw();
-  glTranslatef(s, 0, 0);
+  evil_translate(s, 0, 0);
   draw();
-  glTranslatef(0, s, 0);
+  evil_translate(0, s, 0);
 //  draw();
-  glTranslatef(0, s, 0);
+  evil_translate(0, s, 0);
   draw();
-  glTranslatef(-s, 0, 0);
+  evil_translate(-s, 0, 0);
 //  draw();
-  glTranslatef(-s, 0, 0);
+  evil_translate(-s, 0, 0);
   draw();
-  glTranslatef(0, -s, 0);
+  evil_translate(0, -s, 0);
 //  draw();
 
   // move to next row and draw ring again
-  glTranslatef(0, -s, s);
+  evil_translate(0, -s, s);
   draw();
 
-  glTranslatef(s, 0, 0);
+  evil_translate(s, 0, 0);
   draw();
-  glTranslatef(s, 0, 0);
+  evil_translate(s, 0, 0);
   draw();
-  glTranslatef(0, s, 0);
+  evil_translate(0, s, 0);
   draw();
-  glTranslatef(0, s, 0);
+  evil_translate(0, s, 0);
   draw();
-  glTranslatef(-s, 0, 0);
+  evil_translate(-s, 0, 0);
   draw();
-  glTranslatef(-s, 0, 0);
+  evil_translate(-s, 0, 0);
   draw();
-  glTranslatef(0, -s, 0);
+  evil_translate(0, -s, 0);
   draw();
 
   // move back to center
-  glTranslatef(s, 0, -s);
+  evil_translate(s, 0, -s);
 }
 
 void draw_unit() {
@@ -205,13 +297,33 @@ float g_temp_camera_scale = 1.0;
 float g_perm_camera_scale = 1.0;
 
 void setup_world_camera() {
+  float rotx[16];
+  float roty[16];
+  float scale_temp[16];
+  float scale_perm[16];
+
+  m4f_fill_rotx_m4fo(g_camera_rotation_x, rotx);
+  m4f_fill_roty_m4fo(g_camera_rotation_y, roty);
+  m4f_fill_scale_m4fo(g_temp_camera_scale, 
+    g_temp_camera_scale, g_temp_camera_scale, scale_temp);
+  m4f_fill_scale_m4fo(g_perm_camera_scale,
+    g_perm_camera_scale, g_perm_camera_scale, scale_perm);
+
+  float rotyx[16];
+  m4f_mul_m4fo(roty, rotx, rotyx);
+  float scale[16];
+  m4f_mul_m4fo(scale_perm, scale_temp, scale);
+  m4f_mul_m4fo(scale, rotyx, g_view);
+/*
   glRotatef(g_camera_rotation_x, 0, 1, 0);
   glRotatef(g_camera_rotation_y, 1, 0, 0);
   glScalef(g_temp_camera_scale, g_temp_camera_scale, g_temp_camera_scale);
   glScalef(g_perm_camera_scale, g_perm_camera_scale, g_perm_camera_scale);
+*/
 }
 
 unsigned g_recurse_depth = 1;
+unsigned g_last_recurse_depth = 0;
 
 typedef void(*button_fn)();
 enum { CALLBACK_COUNT = 256 };
@@ -284,21 +396,43 @@ proj_t g_main_proj = ORTHO;
 void reset_to(proj_t proj) {
   glLoadIdentity();
   if (proj == ORTHO) {
-    glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
+//    glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
   } else {
     // because the depth buffer uses a logorithmic scale
     // bad things happen when the frustum crosses z=0
-    glFrustum(0.0, 1.0, 0.0, 1.0, 3.0, 50.0);
-    glTranslatef(0, 0, -4.0);
+//    glFrustum(0.0, 1.0, 0.0, 1.0, 3.0, 50.0);
+//    glTranslatef(0, 0, -4.0);
   }
-  glScalef(g_aspect_scale_x, g_aspect_scale_y, 1.0);
+  m4f_copy_m4fo(g_identity, g_proj);
+  float scale[16];
+  m4f_fill_scale_m4fo(g_aspect_scale_x, g_aspect_scale_y, 1.0, scale);
+  m4f_mul_m4f(scale, g_proj);
+//  glScalef(g_aspect_scale_x, g_aspect_scale_y, 1.0);
 }
 
 void setup_initial_transform() {
   reset_to(g_main_proj);
-  glTranslatef(0.5/g_aspect_scale_x, 0.5/g_aspect_scale_y, 0.5);
-  glScalef(1.0/16.0, 1.0/16.0, 1.0/16.0);
-  glRotatef(30.0, 1.0, 1.0, 1.0);
+  float init_transform[16];
+  float translate[16];
+  m4f_fill_trans_m4fo(
+    0.5/g_aspect_scale_x,
+    0.5/g_aspect_scale_y,
+    0.5,
+    translate);
+
+  float scale[16];
+  m4f_fill_scale_m4fo(
+    1.0/2.00,
+    1.0/2.00,
+    1.0/2.00,
+    scale);
+
+  m4f_mul_m4fo(scale, translate, init_transform);
+  m4f_mul_m4f(init_transform, g_proj);
+
+//  glTranslatef(0.5/g_aspect_scale_x, 0.5/g_aspect_scale_y, 0.5);
+//  glScalef(1.0/16.0, 1.0/16.0, 1.0/16.0);
+//  glRotatef(30.0, 1.0, 1.0, 1.0);
 }
 
 void init_light() {
@@ -345,6 +479,102 @@ void teardown_light() {
   }
 }
 
+//enum { MAX_DEPTH = 6u };
+//const float g_power_of_3[MAX_DEPTH + 1] = {
+//  1, 3, 9, 27, 81, 243, 729,
+//};
+
+void apply_translate(float x, float y, float z, 
+  const float* input, size_t input_count, float* output) {
+  size_t i;
+  for (i = 0; i < input_count; i += 3) {
+    translate_v3fo(x, y, z, input + i, output + i);
+  }
+}
+
+// s = scale
+// input_count = number of floats in input array
+void pattern_transform(float s, const float* input, size_t input_count,
+  float* output) {
+  // ring
+  apply_translate(-s, -s, -s, input, input_count, output);
+  output += input_count;
+  apply_translate(0, -s, -s, input, input_count, output);
+  output += input_count;
+  apply_translate(s, -s, -s, input, input_count, output);
+  output += input_count;
+  apply_translate(s, 0, -s, input, input_count, output);
+  output += input_count;
+  apply_translate(s, s, -s, input, input_count, output);
+  output += input_count;
+  apply_translate(0, s, -s, input, input_count, output);
+  output += input_count;
+  apply_translate(-s, s, -s, input, input_count, output);
+  output += input_count;
+  apply_translate(-s, 0, -s, input, input_count, output);
+  output += input_count;
+
+  // ring with holes
+  apply_translate(-s, -s, 0, input, input_count, output);
+  output += input_count;
+//  apply_translate(0, -s, 0, input, input_count, output);
+//  output += input_count;
+  apply_translate(s, -s, 0, input, input_count, output);
+  output += input_count;
+//  apply_translate(s, 0, 0, input, input_count, output);
+//  output += input_count;
+  apply_translate(s, s, 0, input, input_count, output);
+  output += input_count;
+//  apply_translate(0, s, 0, input, input_count, output);
+//  output += input_count;
+  apply_translate(-s, s, 0, input, input_count, output);
+  output += input_count;
+//  apply_translate(-s, 0, 0, input, input_count, output);
+//  output += input_count;
+
+  // ring
+  apply_translate(-s, -s, s, input, input_count, output);
+  output += input_count;
+  apply_translate(0, -s, s, input, input_count, output);
+  output += input_count;
+  apply_translate(s, -s, s, input, input_count, output);
+  output += input_count;
+  apply_translate(s, 0, s, input, input_count, output);
+  output += input_count;
+  apply_translate(s, s, s, input, input_count, output);
+  output += input_count;
+  apply_translate(0, s, s, input, input_count, output);
+  output += input_count;
+  apply_translate(-s, s, s, input, input_count, output);
+  output += input_count;
+  apply_translate(-s, 0, s, input, input_count, output);
+  output += input_count;
+}
+
+void recalculate_sponge() {
+  size_t cube_count = 1;
+  float* buffer_arr[MAX_DEPTH];
+  size_t buffer_arr_size[MAX_DEPTH];
+  unsigned i;
+  for (i = 0; i <= g_recurse_depth; ++i) {
+    cube_count *= 20u;
+    buffer_arr_size[i] = cube_count * sizeof(g_slow_cube_vbuffer);
+    buffer_arr[i] = malloc(buffer_arr_size[i]);
+  }
+
+  pattern_transform(1, g_slow_cube_vbuffer, 
+    sizeof(g_slow_cube_vbuffer)/sizeof(float), buffer_arr[0]);
+
+  glBindBuffer(GL_ARRAY_BUFFER, g_cube_vbuffer_id);
+  glBufferData(GL_ARRAY_BUFFER, buffer_arr_size[g_recurse_depth], buffer_arr[g_recurse_depth], GL_STATIC_DRAW);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+  glEnableVertexAttribArray(0);
+  
+  for (i = 0; i < g_recurse_depth; ++i) {
+    free(buffer_arr[i]);
+  }
+}
+
 GLuint g_program_id;
 
 unsigned g_skip_sponge_redraw = 0;
@@ -355,21 +585,68 @@ void display() {
   } else {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+//    if (g_recurse_depth != g_last_recurse_depth) {
+//      g_last_recurse_depth = g_recurse_depth;
+//      recalculate_sponge();
+//    }
+
     setup_initial_transform();
 //    setup_light();
 
     setup_world_camera();
     glUseProgram(g_program_id);
-    GLboolean transpose = GL_TRUE;
-    glUniformMatrix4fv(g_mvp_id, 1, transpose, mvp_matrix);
+
+    float rot_matrix[16];
+    if (0) {
+      float rotx_matrix[16];
+      m4f_fill_rotx_m4fo(M_PI_4/2, rotx_matrix);
+      float roty_matrix[16];
+      m4f_fill_roty_m4fo(M_PI_4/2, roty_matrix);
+      float rotz_matrix[16];
+      m4f_fill_roty_m4fo(M_PI_4/2, rotz_matrix);
+      float rotxy_matrix[16];
+      m4f_mul_m4fo(rotx_matrix, roty_matrix, rotxy_matrix);
+      m4f_mul_m4fo(rotxy_matrix, rotz_matrix, rot_matrix);
+    } else {
+      m4f_copy_m4fo(g_identity, rot_matrix);
+    }
+    
+    float init_matrix[16];
+    m4f_copy_m4fo(g_identity, init_matrix);
+    m4f_mul_m4f(g_proj, init_matrix);
+
+    m4f_mul_m4fo(init_matrix, g_view, g_mvp_matrix);
+
+    m4f_print(g_mvp_matrix);
+    printf("\n");
+
+    glUniformMatrix4fv(g_mvp_id, 1, GL_TRUE, g_mvp_matrix);
     glBindBuffer(GL_ARRAY_BUFFER, g_cube_vbuffer_id);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_cube_ibuffer_id);
-    glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
+    draw_menger_sponge(g_recurse_depth);
+/*    glUniform4f(g_color_id, 1.0, 1.0, 1.0, 1.0);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glUniform4f(g_color_id, 0.0, 1.0, 1.0, 1.0);
+    glDrawArrays(GL_TRIANGLES, 6, 6);
+    glUniform4f(g_color_id, 1.0, 0.0, 1.0, 1.0);
+    glDrawArrays(GL_TRIANGLES, 12, 6);
+    glUniform4f(g_color_id, 1.0, 1.0, 0.0, 1.0);
+    glDrawArrays(GL_TRIANGLES, 18, 6);
+    glUniform4f(g_color_id, 0.0, 0.0, 1.0, 1.0);
+    glDrawArrays(GL_TRIANGLES, 24, 6);
+    glUniform4f(g_color_id, 0.0, 1.0, 0.0, 1.0);
+    glDrawArrays(GL_TRIANGLES, 30, 6);
+    glUniform4f(g_color_id, 1.0, 0.0, 0.0, 1.0);
+    glDrawArrays(GL_TRIANGLES, 36, 6);
+    glUniform4f(g_color_id, 0.25, 0.25, 0.25, 1.0);
+    glDrawArrays(GL_TRIANGLES, 42, 6);
+*/    glBindBuffer(GL_ARRAY_BUFFER, 0);
+//    draw_cube();
+//    glDrawArrays(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
 //    draw_menger_sponge(g_recurse_depth);
 //    teardown_light();
   }
-  reset_to(ORTHO);
-  draw_buttons();
+//  reset_to(ORTHO);
+//  draw_buttons();
 
   glutSwapBuffers();
 }
@@ -411,8 +688,8 @@ const int VERTEX_INDEX_IN_SHADER = 0;
 void load_buffers() {
   glGenBuffers(1, &g_cube_vbuffer_id);
   glBindBuffer(GL_ARRAY_BUFFER, g_cube_vbuffer_id);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(g_cube_vbuffer),
-    g_cube_vbuffer, GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(g_slow_cube_vbuffer),
+    g_slow_cube_vbuffer, GL_STATIC_DRAW);
   glVertexAttribPointer(VERTEX_INDEX_IN_SHADER, 3, GL_FLOAT, GL_FALSE, 0, 0);
   glEnableVertexAttribArray(VERTEX_INDEX_IN_SHADER);
 
@@ -436,7 +713,23 @@ void compile_shader(GLuint shader_id) {
     char* error_message = malloc(info_log_length + 1);
     error_message[info_log_length] = '\0';
     glGetShaderInfoLog(shader_id, info_log_length, NULL, error_message);
-    fprintf(stderr, "%s\n", error_message);
+    fprintf(stderr, "Shader compile failure!\n%s\n", error_message);
+    free(error_message);
+  }
+}
+
+void link_program(GLuint program_id) {
+  glLinkProgram(program_id);
+
+  GLint result = GL_FALSE;
+  int info_log_length;
+  glGetProgramiv(program_id, GL_LINK_STATUS, &result);
+  glGetProgramiv(program_id, GL_INFO_LOG_LENGTH, &info_log_length);
+  if (result == GL_FALSE) {
+    char* error_message = malloc(info_log_length + 1);
+    error_message[info_log_length] = '\0';
+    glGetProgramInfoLog(program_id, info_log_length, NULL, error_message);
+    fprintf(stderr, "Shader link failure!\n%s\n", error_message);
     free(error_message);
   }
 }
@@ -456,22 +749,10 @@ void load_shaders() {
   compile_shader(vert_shader);
   compile_shader(frag_shader);
 
-  // Link the program
   GLuint program = glCreateProgram();
   glAttachShader(program, vert_shader);
   glAttachShader(program, frag_shader);
-  glLinkProgram(program);
-
-  // Check the program
-  GLint result = GL_FALSE;
-  int info_log_length;
-  glGetProgramiv(program, GL_LINK_STATUS, &result);
-  glGetProgramiv(program, GL_INFO_LOG_LENGTH, &info_log_length);
-  char* error_message = malloc(info_log_length + 1);
-  error_message[info_log_length] = '\0';
-  glGetProgramInfoLog(program, info_log_length, NULL, error_message);
-  fprintf(stderr, "%s\n", error_message);
-  free(error_message);
+  link_program(program);
  
   glDeleteShader(vert_shader);
   glDeleteShader(frag_shader);
@@ -546,14 +827,15 @@ void init() {
   load_buffers();
 
   g_mvp_id = glGetUniformLocation(g_program_id, "mvp");
+  g_color_id = glGetUniformLocation(g_program_id, "color");
 
   glClearColor(0.0, 0.0, 0.0, 0.0);
   glEnable(GL_DEPTH_TEST);
-  glEnable(GL_CULL_FACE);
-  glMatrixMode(GL_PROJECTION);
+//  glEnable(GL_CULL_FACE);
+//  glMatrixMode(GL_PROJECTION);
 
-  init_light();
-  init_material();
+//  init_light();
+//  init_material();
 }
 
 int g_rotating = 0;
@@ -839,6 +1121,11 @@ void calculate_normals() {
     const float* c = vertex3f(g_cube_vbuffer, g_cube_ibuffer[i + 2]);
     triangle_normal_3fo(a, b, c, g_cube_normal_buffer + i);
   }
+}
+
+void cleanup() {
+  glDeleteBuffers(1, &g_cube_vbuffer_id);
+  glDeleteBuffers(1, &g_cube_ibuffer_id);
 }
 
 int main(int argc, char** argv) {

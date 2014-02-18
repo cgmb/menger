@@ -558,25 +558,52 @@ void pattern_transform(float s, const float* input, size_t input_count,
   output += input_count;
 }
 
+int g_buffer_vert_count = 0;
+
 void recalculate_sponge() {
   size_t cube_count = 1;
-  float* buffer_arr[MAX_DEPTH];
-  size_t buffer_arr_size[MAX_DEPTH];
+  float* buffer_arr[MAX_DEPTH]; // todo: off-by-1?
+  size_t buffer_arr_size[MAX_DEPTH]; // todo: off-by-1?
   unsigned i;
   for (i = 0; i <= g_recurse_depth; ++i) {
     cube_count *= 20u;
     buffer_arr_size[i] = cube_count * sizeof(g_slow_cube_vbuffer);
     buffer_arr[i] = malloc(buffer_arr_size[i]);
+    if (!buffer_arr[i]) {
+      fprintf(stderr, "Failed to allocate %lu bytes.\n", buffer_arr_size[i]);
+      exit(3);
+    }
+
+    if (i == 0) {
+      pattern_transform(g_power_of_3[i], g_slow_cube_vbuffer, 
+        sizeof(g_slow_cube_vbuffer)/sizeof(float), buffer_arr[i]);
+    } else {
+      pattern_transform(g_power_of_3[i], buffer_arr[i-1], 
+        buffer_arr_size[i-1]/sizeof(float), buffer_arr[i]);
+    }
   }
 
-  pattern_transform(1, g_slow_cube_vbuffer, 
-    sizeof(g_slow_cube_vbuffer)/sizeof(float), buffer_arr[0]);
-
+//  pattern_transform(0, g_slow_cube_vbuffer, 
+//    sizeof(g_slow_cube_vbuffer)/sizeof(float), buffer_arr[g_recurse_depth]);
+//  memcpy(buffer_arr[g_recurse_depth], g_slow_cube_vbuffer, sizeof(g_slow_cube_vbuffer));
+/*
+  for (i = 0; i < sizeof(g_slow_cube_vbuffer)/sizeof(float); ++i) {
+    printf("(% f, % f, % f)\n", 
+      buffer_arr[g_recurse_depth][i], 
+      buffer_arr[g_recurse_depth][i],
+      buffer_arr[g_recurse_depth][i]);
+  }
+  printf("\n");
+*/
   glBindBuffer(GL_ARRAY_BUFFER, g_cube_vbuffer_id);
-  glBufferData(GL_ARRAY_BUFFER, buffer_arr_size[g_recurse_depth], buffer_arr[g_recurse_depth], GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, buffer_arr_size[g_recurse_depth], 
+    buffer_arr[g_recurse_depth], GL_STATIC_DRAW);
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
   glEnableVertexAttribArray(0);
-  
+
+  g_buffer_vert_count = buffer_arr_size[g_recurse_depth]/sizeof(float);
+//  g_buffer_vert_count = sizeof(g_slow_cube_vbuffer)/sizeof(float);
+
   for (i = 0; i < g_recurse_depth; ++i) {
     free(buffer_arr[i]);
   }
@@ -592,10 +619,10 @@ void display() {
   } else {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-//    if (g_recurse_depth != g_last_recurse_depth) {
-//      g_last_recurse_depth = g_recurse_depth;
-//      recalculate_sponge();
-//    }
+    if (g_recurse_depth != g_last_recurse_depth) {
+      g_last_recurse_depth = g_recurse_depth;
+      recalculate_sponge();
+    }
 
     setup_initial_transform();
 //    setup_light();
@@ -624,14 +651,14 @@ void display() {
 
     m4f_mul_m4fo(init_matrix, g_view, g_mvp_matrix);
 
-    m4f_print(g_mvp_matrix);
-    printf("\n");
+//    m4f_print(g_mvp_matrix);
+//    printf("\n");
 
     glUniformMatrix4fv(g_mvp_id, 1, GL_TRUE, g_mvp_matrix);
     glBindBuffer(GL_ARRAY_BUFFER, g_cube_vbuffer_id);
-    draw_menger_sponge(g_recurse_depth);
-/*    glUniform4f(g_color_id, 1.0, 1.0, 1.0, 1.0);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+//    draw_menger_sponge(g_recurse_depth);
+    glUniform4f(g_color_id, 1.0, 1.0, 1.0, 1.0);
+/*    glDrawArrays(GL_TRIANGLES, 0, 6);
     glUniform4f(g_color_id, 0.0, 1.0, 1.0, 1.0);
     glDrawArrays(GL_TRIANGLES, 6, 6);
     glUniform4f(g_color_id, 1.0, 0.0, 1.0, 1.0);
@@ -648,7 +675,7 @@ void display() {
     glDrawArrays(GL_TRIANGLES, 42, 6);
 */    glBindBuffer(GL_ARRAY_BUFFER, 0);
 //    draw_cube();
-//    glDrawArrays(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
+    glDrawArrays(GL_TRIANGLES, 0, g_buffer_vert_count);
 //    draw_menger_sponge(g_recurse_depth);
 //    teardown_light();
   }
@@ -895,8 +922,8 @@ void mouse_press(int button, int state, int x, int y) {
 
 void mouse_move(int x, int y) {
   if (g_rotating) {
-    float diff_x = g_last_x - x;
-    float diff_y = g_last_y - y;
+    float diff_x = 0.25 * (g_last_x - x);
+    float diff_y = 0.25 * (g_last_y - y);
 
     g_camera_rotation_x += 360.0 * (diff_x / g_window_size_x);
     g_camera_rotation_y += 360.0 * (diff_y / g_window_size_y);

@@ -36,7 +36,7 @@ void m4f_print(const float* m) {
   printf("[% f % f % f % f]\n"
          "[% f % f % f % f]\n"
          "[% f % f % f % f]\n"
-         "[% f % f % f % f]\n", 
+         "[% f % f % f % f]\n",
     m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7],
     m[8], m[9], m[10], m[11], m[12], m[13], m[14], m[15]);
 }
@@ -134,11 +134,11 @@ float normal_scale(int value, int offset, int steps) {
 void triangle_normal_3fo(
 const float* a, const float* b, const float* c, float* result) {
   float ab[3];
-  difference_3fo(b, a, ab);
+  difference_v3fo(b, a, ab);
   float ac[3];
-  difference_3fo(c, a, ac);
-  cross_product_3fo(ab, ac, result);
-  normalize_3f(result);
+  difference_v3fo(c, a, ac);
+  v3f_cross_v3fo(ab, ac, result);
+  normalize_v3f(result);
 }
 
 int g_use_lighting = 0;
@@ -184,7 +184,7 @@ void evil_translate(float x, float y, float z) {
   float evil[16];
   m4f_mul_m4fo(g_mvp_matrix, m, evil);
   m4f_copy_m4fo(evil, g_mvp_matrix);
-  
+
   glUniformMatrix4fv(g_mvp_id, 1, GL_TRUE, g_mvp_matrix);
 }
 
@@ -304,7 +304,7 @@ void setup_world_camera() {
 
   m4f_fill_rotx_m4fo(g_camera_rotation_x, rotx);
   m4f_fill_roty_m4fo(g_camera_rotation_y, roty);
-  m4f_fill_scale_m4fo(g_temp_camera_scale, 
+  m4f_fill_scale_m4fo(g_temp_camera_scale,
     g_temp_camera_scale, g_temp_camera_scale, scale_temp);
   m4f_fill_scale_m4fo(g_perm_camera_scale,
     g_perm_camera_scale, g_perm_camera_scale, scale_perm);
@@ -468,8 +468,8 @@ void setup_light() {
     float transformed_2[4] = {};
     float x = -g_camera_rotation_y / 180.0 * M_PI;
     float y = -g_camera_rotation_x / 180.0 * M_PI;
-    rotatey_3fo(y, original_position, transformed_1);
-    rotatex_3fo(x, transformed_1, transformed_2);
+    rotatey_v3fo(y, original_position, transformed_1);
+    rotatex_v3fo(x, transformed_1, transformed_2);
     glLightfv(GL_LIGHT0, GL_POSITION, transformed_2);
 
     glEnable(GL_LIGHTING);
@@ -491,7 +491,7 @@ void teardown_light() {
 //  1, 3, 9, 27, 81, 243, 729,
 //};
 
-void apply_translate(float x, float y, float z, 
+void apply_translate(float x, float y, float z,
   const float* input, size_t input_count, float* output) {
   size_t i;
   for (i = 0; i < input_count; i += 3) {
@@ -575,28 +575,28 @@ void recalculate_sponge() {
     }
 
     if (i == 0) {
-      pattern_transform(g_power_of_3[i], g_slow_cube_vbuffer, 
+      pattern_transform(g_power_of_3[i], g_slow_cube_vbuffer,
         sizeof(g_slow_cube_vbuffer)/sizeof(float), buffer_arr[i]);
     } else {
-      pattern_transform(g_power_of_3[i], buffer_arr[i-1], 
+      pattern_transform(g_power_of_3[i], buffer_arr[i-1],
         buffer_arr_size[i-1]/sizeof(float), buffer_arr[i]);
     }
   }
 
-//  pattern_transform(0, g_slow_cube_vbuffer, 
+//  pattern_transform(0, g_slow_cube_vbuffer,
 //    sizeof(g_slow_cube_vbuffer)/sizeof(float), buffer_arr[g_recurse_depth]);
 //  memcpy(buffer_arr[g_recurse_depth], g_slow_cube_vbuffer, sizeof(g_slow_cube_vbuffer));
 /*
   for (i = 0; i < sizeof(g_slow_cube_vbuffer)/sizeof(float); ++i) {
-    printf("(% f, % f, % f)\n", 
-      buffer_arr[g_recurse_depth][i], 
+    printf("(% f, % f, % f)\n",
+      buffer_arr[g_recurse_depth][i],
       buffer_arr[g_recurse_depth][i],
       buffer_arr[g_recurse_depth][i]);
   }
   printf("\n");
 */
   glBindBuffer(GL_ARRAY_BUFFER, g_cube_vbuffer_id);
-  glBufferData(GL_ARRAY_BUFFER, buffer_arr_size[g_recurse_depth], 
+  glBufferData(GL_ARRAY_BUFFER, buffer_arr_size[g_recurse_depth],
     buffer_arr[g_recurse_depth], GL_STATIC_DRAW);
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
   glEnableVertexAttribArray(0);
@@ -644,7 +644,7 @@ void display() {
     } else {
       m4f_copy_m4fo(g_identity, rot_matrix);
     }
-    
+  
     float init_matrix[16];
     m4f_copy_m4fo(g_identity, init_matrix);
     m4f_mul_m4f(g_proj, init_matrix);
@@ -787,7 +787,7 @@ void load_shaders() {
   glAttachShader(program, vert_shader);
   glAttachShader(program, frag_shader);
   link_program(program);
- 
+
   glDeleteShader(vert_shader);
   glDeleteShader(frag_shader);
 
@@ -806,7 +806,7 @@ void load_glew() {
   printf("GLEW version: %s\n", glewGetString(GLEW_VERSION));
 }
 
-int check_version_string(const char* name, const char* version, 
+int check_version_string(const char* name, const char* version,
   long major_req, long minor_req, const char* version_req) {
   printf("%s version: %s\n", name, version);
   char* end;
@@ -843,13 +843,13 @@ int check_version_string(const char* name, const char* version,
 
 void check_minimum_opengl_version() {
   int fail = 0;
-  fail |= check_version_string("OpenGL", 
+  fail |= check_version_string("OpenGL",
     (const char*)glGetString(GL_VERSION), 3, 0, "3.0");
-  fail |= check_version_string("OpenGL Shading Language", 
+  fail |= check_version_string("OpenGL Shading Language",
     (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION), 1, 3, "1.30");
   if (fail) {
-    fprintf(stderr, COLOR_RED 
-      "You do not meet the minimum OpenGL requirements!\n" 
+    fprintf(stderr, COLOR_RED
+      "You do not meet the minimum OpenGL requirements!\n"
       COLOR_RESET);
   }
 }

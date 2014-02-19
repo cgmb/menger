@@ -1,23 +1,21 @@
 CC=gcc
-CFLAGS=-Werror -Wall -Wextra -Wno-unused-parameter
+override CFLAGS += -Werror -Wall -Wextra -Wno-unused-parameter
 release: CFLAGS += -O2
 debug: CFLAGS += -g
-sanitize_addr: CFLAGS += -fsanitize=address
 LIBS=-lGLEW -lGL -lGLU -lglut -lm
+EXENAME=menger
 
-all: menger
+all: release
 
 release: menger
 
 debug: menger
 
-sanitize_addr: menger
-
 menger: main.c vector_math.h
-	$(CC) $< -o $@ $(CFLAGS) $(LIBS)
+	$(CC) $< -o $(EXENAME) $(CFLAGS) $(LIBS)
 
-run: menger
-	./$<
+run:
+	./$(EXENAME)
 
 clean:
-	rm -rf menger
+	rm -rf $(EXENAME)

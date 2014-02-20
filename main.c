@@ -6,6 +6,7 @@
 #include <string.h>
 #include <GL/glew.h>
 #include <GL/glut.h>
+#include <GL/freeglut.h>
 #include "vector_math.h"
 
 #ifndef BUFFER_OFFSET
@@ -113,6 +114,7 @@ const size_t g_cube_ibuffer_size
 
 GLuint g_cube_vbuffer_id;
 GLuint g_cube_ibuffer_id;
+GLuint g_cube_varray_id;
 
 float g_cube_normal_buffer[36];
 
@@ -394,7 +396,7 @@ typedef enum { ORTHO, PERSPECTIVE } proj_t;
 proj_t g_main_proj = ORTHO;
 
 void reset_to(proj_t proj) {
-  glLoadIdentity();
+//  glLoadIdentity();
   m4f_copy_m4fo(g_identity, g_proj);
   if (proj == ORTHO) {
 //    glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
@@ -595,6 +597,7 @@ void recalculate_sponge() {
   }
   printf("\n");
 */
+  glBindVertexArray(g_cube_varray_id);
   glBindBuffer(GL_ARRAY_BUFFER, g_cube_vbuffer_id);
   glBufferData(GL_ARRAY_BUFFER, buffer_arr_size[g_recurse_depth],
     buffer_arr[g_recurse_depth], GL_STATIC_DRAW);
@@ -655,7 +658,8 @@ void display() {
 //    printf("\n");
 
     glUniformMatrix4fv(g_mvp_id, 1, GL_TRUE, g_mvp_matrix);
-    glBindBuffer(GL_ARRAY_BUFFER, g_cube_vbuffer_id);
+//    glBindBuffer(GL_ARRAY_BUFFER, g_cube_vbuffer_id);
+    glBindVertexArray(g_cube_varray_id);
 //    draw_menger_sponge(g_recurse_depth);
     glUniform4f(g_color_id, 1.0, 1.0, 1.0, 1.0);
 /*    glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -720,6 +724,9 @@ exit:
 const int VERTEX_INDEX_IN_SHADER = 0;
 
 void load_buffers() {
+  glGenVertexArrays(1, &g_cube_varray_id);
+  glBindVertexArray(g_cube_varray_id);
+
   glGenBuffers(1, &g_cube_vbuffer_id);
   glBindBuffer(GL_ARRAY_BUFFER, g_cube_vbuffer_id);
   glBufferData(GL_ARRAY_BUFFER, sizeof(g_slow_cube_vbuffer),
@@ -798,6 +805,7 @@ void load_shaders() {
 }
 
 void load_glew() {
+  glewExperimental = GL_TRUE; // VAOs on Intel Linux
   GLenum glew_status = glewInit();
   if (GLEW_OK != glew_status) {
     fprintf(stderr, "Error: %s\n", glewGetErrorString(glew_status));
@@ -865,7 +873,7 @@ void init() {
 
   glClearColor(0.0, 0.0, 0.0, 0.0);
   glEnable(GL_DEPTH_TEST);
-//  glEnable(GL_CULL_FACE);
+  glEnable(GL_CULL_FACE);
 //  glMatrixMode(GL_PROJECTION);
 
 //  init_light();
@@ -1160,10 +1168,13 @@ void calculate_normals() {
 void cleanup() {
   glDeleteBuffers(1, &g_cube_vbuffer_id);
   glDeleteBuffers(1, &g_cube_ibuffer_id);
+  glDeleteVertexArrays(1, &g_cube_varray_id);
 }
 
 int main(int argc, char** argv) {
   glutInit(&argc, argv);
+  glutInitContextVersion(3, 3);
+  glutInitContextProfile(GLUT_CORE_PROFILE);
   glutInitDisplayMode(GLUT_DOUBLE | GLUT_DEPTH | GLUT_RGB);
   glutInitWindowSize(g_window_size_x, g_window_size_y);
   glutInitWindowPosition(100, 100);

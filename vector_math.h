@@ -40,28 +40,74 @@ void normalize_v3f(float* x) {
   scale_v3f(1/magnitude, x);
 }
 
+void m3f_copy_m3fo(const float* m, float* result) {
+  memcpy(result, m, 9 * sizeof(float));
+}
+
+void m3f_mul_m3fo(const float* m, const float* n, float* result) {
+  result[0] = m[0]*n[0] + m[1]*n[3] + m[2]*n[6];
+  result[1] = m[0]*n[1] + m[1]*n[4] + m[2]*n[7];
+  result[2] = m[0]*n[2] + m[1]*n[5] + m[2]*n[8];
+
+  result[3] = m[3]*n[0] + m[4]*n[3] + m[5]*n[6];
+  result[4] = m[3]*n[1] + m[4]*n[4] + m[5]*n[7];
+  result[5] = m[3]*n[2] + m[4]*n[5] + m[5]*n[8];
+
+  result[6] = m[6]*n[0] + m[7]*n[3] + m[8]*n[6];
+  result[7] = m[6]*n[1] + m[7]*n[4] + m[8]*n[7];
+  result[8] = m[6]*n[2] + m[7]*n[5] + m[8]*n[8];
+}
+
 void m3f_mul_v3fo(const float* m, const float* v, float* result) {
   result[0] = m[0]*v[0] + m[1]*v[1] + m[2]*v[2];
   result[1] = m[3]*v[0] + m[4]*v[1] + m[5]*v[2];
   result[2] = m[6]*v[0] + m[7]*v[1] + m[8]*v[2];
 }
 
-void rotatex_v3fo(float rx, const float* v, float* result) {
+void m3f_mul_av3fo(float* m, const float* input, size_t count, float* result) {
+  size_t i;
+  for(i = 0; i < count; i += 3) {
+    m3f_mul_v3fo(m, input + i, result + i);
+  }
+}
+
+void m3f_fill_rotx_m3fo(float rx, float* result) {
   float m[] = {
     1,  0,         0,
     0,  cosf(rx), -sinf(rx),
     0,  sinf(rx),  cosf(rx),
   };
-  m3f_mul_v3fo(m, v, result);
+  m3f_copy_m3fo(m, result);
 }
 
-void rotatey_v3fo(float ry, const float* v, float* result) {
+void m3f_fill_roty_m3fo(float ry, float* result) {
   float m[] = {
     cosf(ry),  0,  sinf(ry),
     0,         1,  0,
    -sinf(ry),  0,  cosf(ry),
   };
-  m3f_mul_v3fo(m, v, result);
+  m3f_copy_m3fo(m, result);
+}
+
+void m3f_fill_rotz_m3fo(float rz, float* result) {
+  float m[] = {
+    cosf(rz), -sinf(rz), 0,
+    sinf(rz),  cosf(rz), 0,
+    0,         0,        1,
+  };
+  m3f_copy_m3fo(m, result);
+}
+
+void rotatex_v3fo(float rx, const float* v, float* result) {
+  float rm[9];
+  m3f_fill_rotx_m3fo(rx, rm);
+  m3f_mul_m3fo(rm, v, result);
+}
+
+void rotatey_v3fo(float ry, const float* v, float* result) {
+  float rm[16];
+  m3f_fill_roty_m3fo(ry, rm);
+  m3f_mul_m3fo(rm, v, result);
 }
 
 void m4f_copy_m4fo(const float* m, float* result) {

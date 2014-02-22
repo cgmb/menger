@@ -8,12 +8,7 @@
 #include <GL/glut.h>
 #include <GL/freeglut.h>
 #include "vector_math.h"
-
-#ifndef BUFFER_OFFSET
-#define BUFFER_OFFSET(i) ((char *)NULL + (i))
-#else
-#error BUFFER_OFFSET already defined!
-#endif
+#include "vector_debug.h"
 
 const float g_ortho[] = {
   1, 0, 0, 0,
@@ -33,17 +28,72 @@ float g_proj[16];
 float g_view[16];
 float g_mvp_matrix[16];
 
-void m4f_print(const float* m) {
-  printf("[% f % f % f % f]\n"
-         "[% f % f % f % f]\n"
-         "[% f % f % f % f]\n"
-         "[% f % f % f % f]\n",
-    m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7],
-    m[8], m[9], m[10], m[11], m[12], m[13], m[14], m[15]);
-}
-
 GLuint g_mvp_id;
 GLuint g_color_id;
+
+const float g_face_vbuffer[] = {
+  // front face
+  // from top left in reading order
+  // left->right, top->bottom
+  -1.5, -1.5,  1.5,
+  -0.5, -1.5,  1.5,
+   0.5, -1.5,  1.5,
+   1.5, -1.5,  1.5,
+  -1.5, -0.5,  1.5,
+  -0.5, -0.5,  1.5,
+   0.5, -0.5,  1.5,
+   1.5, -0.5,  1.5,
+  -1.5,  0.5,  1.5,
+  -0.5,  0.5,  1.5,
+   0.5,  0.5,  1.5,
+   1.5,  0.5,  1.5,
+  -1.5,  1.5,  1.5,
+  -0.5,  1.5,  1.5,
+   0.5,  1.5,  1.5,
+   1.5,  1.5,  1.5,
+
+  // same face direction, internal sides
+  -0.5, -1.5, -0.5,
+   0.5, -1.5, -0.5,
+  -0.5, -0.5, -0.5,
+   0.5, -0.5, -0.5,
+  -1.5, -0.5, -0.5,
+  -0.5, -0.5, -0.5,
+  -1.5,  0.5, -0.5,
+  -0.5,  0.5, -0.5,
+   0.5, -0.5, -0.5,
+   1.5, -0.5, -0.5,
+   0.5,  0.5, -0.5,
+   1.5,  0.5, -0.5,
+  -0.5,  0.5, -0.5,
+   0.5,  0.5, -0.5,
+  -0.5,  1.5, -0.5,
+   0.5,  1.5, -0.5,
+};
+
+const GLubyte g_face_ibuffer[] = {
+   4,  1,  0,  4,  5,  1,
+   5,  2,  1,  5,  6,  2,
+   6,  3,  2,  6,  7,  3,
+   8,  5,  4,  8,  9,  5,
+  10,  7,  6, 10, 11,  7,
+  12,  9,  8, 12, 13,  9,
+  13, 10,  9, 13, 14, 10,
+  14, 11, 10, 14, 15, 11,
+  18, 17, 16, 18, 19, 17,
+  22, 21, 20, 22, 23, 21,
+  26, 25, 24, 26, 27, 25,
+  30, 29, 28, 30, 31, 29,
+};
+
+enum {
+  UNIT_VERTEX_FLOAT_COUNT = 6uL*(sizeof(g_face_vbuffer)/sizeof(g_face_vbuffer[0])),
+  UNIT_INDEX_COUNT = 6uL*(sizeof(g_face_ibuffer)/sizeof(g_face_ibuffer[0])),
+};
+
+float g_unit_vbuffer[UNIT_VERTEX_FLOAT_COUNT];
+GLubyte g_unit_ibuffer[UNIT_INDEX_COUNT];
+float g_unit_cbuffer[UNIT_VERTEX_FLOAT_COUNT];
 
 const float g_slow_cube_vbuffer[] = {
   -0.5, -0.5,  0.5, // 0
@@ -100,7 +150,7 @@ const float g_cube_vbuffer[] = {
   -0.5,  0.5, -0.5, // 7 front bottom left
 };
 
-const size_t g_cube_ibuffer[] = {
+const GLubyte g_cube_ibuffer[] = {
   0, 1, 2, 0, 2, 3, // back
   5, 1, 0, 4, 5, 0, // top
   7, 4, 0, 3, 7, 0, // left
@@ -112,15 +162,22 @@ const size_t g_cube_ibuffer[] = {
 const size_t g_cube_ibuffer_size
   = sizeof(g_cube_ibuffer)/sizeof(g_cube_ibuffer[0]);
 
-GLuint g_cube_vbuffer_id;
-GLuint g_cube_ibuffer_id;
-GLuint g_cube_varray_id;
+GLuint g_varray_id;
+
+enum {
+  DATA_VERTEX,
+  DATA_INDEX,
+  DATA_COLOR,
+//  DATA_NORMAL,
+
+  DATA_COUNT,
+};
+
+GLuint g_buffer_id[DATA_COUNT];
 
 float g_cube_normal_buffer[36];
 
-GLuint g_cube_normal_buffer_id;
-
-const size_t* g_square_ibuffer = g_cube_ibuffer + 0;
+const GLubyte* g_square_ibuffer = g_cube_ibuffer + 0;
 const size_t g_square_ibuffer_size = 6;
 
 // lookup a vertex within the given float buffer
@@ -330,7 +387,7 @@ unsigned g_last_recurse_depth = 0;
 typedef void(*button_fn)();
 enum { CALLBACK_COUNT = 256 };
 // we can afford wasting a few kiB of memory for this
-button_fn g_button_callbacks[CALLBACK_COUNT + 1] = {};
+button_fn g_button_callbacks[CALLBACK_COUNT + 1] = { 0 };
 size_t g_pressed_button = CALLBACK_COUNT;
 
 void draw_button(float r, float g, float b) {
@@ -466,8 +523,8 @@ void init_material() {
 void setup_light() {
   if (g_use_lighting) {
     float original_position[] = { 1, 1, 1, 0 };
-    float transformed_1[4] = {};
-    float transformed_2[4] = {};
+    float transformed_1[4] = { 0 };
+    float transformed_2[4] = { 0 };
     float x = -g_camera_rotation_y / 180.0 * M_PI;
     float y = -g_camera_rotation_x / 180.0 * M_PI;
     rotatey_v3fo(y, original_position, transformed_1);
@@ -487,11 +544,6 @@ void teardown_light() {
     glDisable(GL_COLOR_MATERIAL);
   }
 }
-
-//enum { MAX_DEPTH = 6u };
-//const float g_power_of_3[MAX_DEPTH + 1] = {
-//  1, 3, 9, 27, 81, 243, 729,
-//};
 
 void apply_translate(float x, float y, float z,
   const float* input, size_t input_count, float* output) {
@@ -564,14 +616,15 @@ int g_buffer_vert_count = 0;
 
 void recalculate_sponge() {
   size_t cube_count = 1;
-  float* buffer_arr[MAX_DEPTH]; // todo: off-by-1?
-  size_t buffer_arr_size[MAX_DEPTH]; // todo: off-by-1?
+  float* buffer_arr[MAX_DEPTH];
+  size_t buffer_arr_size[MAX_DEPTH];
   unsigned i;
   for (i = 0; i <= g_recurse_depth; ++i) {
     cube_count *= 20u;
     buffer_arr_size[i] = cube_count * sizeof(g_slow_cube_vbuffer);
     buffer_arr[i] = malloc(buffer_arr_size[i]);
     if (!buffer_arr[i]) {
+      // memory usage increases very quickly...
       fprintf(stderr, "Failed to allocate %lu bytes.\n", buffer_arr_size[i]);
       exit(3);
     }
@@ -585,27 +638,14 @@ void recalculate_sponge() {
     }
   }
 
-//  pattern_transform(0, g_slow_cube_vbuffer,
-//    sizeof(g_slow_cube_vbuffer)/sizeof(float), buffer_arr[g_recurse_depth]);
-//  memcpy(buffer_arr[g_recurse_depth], g_slow_cube_vbuffer, sizeof(g_slow_cube_vbuffer));
-/*
-  for (i = 0; i < sizeof(g_slow_cube_vbuffer)/sizeof(float); ++i) {
-    printf("(% f, % f, % f)\n",
-      buffer_arr[g_recurse_depth][i],
-      buffer_arr[g_recurse_depth][i],
-      buffer_arr[g_recurse_depth][i]);
-  }
-  printf("\n");
-*/
-  glBindVertexArray(g_cube_varray_id);
-  glBindBuffer(GL_ARRAY_BUFFER, g_cube_vbuffer_id);
+  glBindVertexArray(g_varray_id);
+  glBindBuffer(GL_ARRAY_BUFFER, g_buffer_id[DATA_VERTEX]);
   glBufferData(GL_ARRAY_BUFFER, buffer_arr_size[g_recurse_depth],
     buffer_arr[g_recurse_depth], GL_STATIC_DRAW);
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
   glEnableVertexAttribArray(0);
 
   g_buffer_vert_count = buffer_arr_size[g_recurse_depth]/sizeof(float);
-//  g_buffer_vert_count = sizeof(g_slow_cube_vbuffer)/sizeof(float);
 
   for (i = 0; i < g_recurse_depth; ++i) {
     free(buffer_arr[i]);
@@ -624,7 +664,7 @@ void display() {
 
     if (g_recurse_depth != g_last_recurse_depth) {
       g_last_recurse_depth = g_recurse_depth;
-      recalculate_sponge();
+      //recalculate_sponge();
     }
 
     setup_initial_transform();
@@ -633,53 +673,18 @@ void display() {
     setup_world_camera();
     glUseProgram(g_program_id);
 
-    float rot_matrix[16];
-    if (0) {
-      float rotx_matrix[16];
-      m4f_fill_rotx_m4fo(M_PI_4/2, rotx_matrix);
-      float roty_matrix[16];
-      m4f_fill_roty_m4fo(M_PI_4/2, roty_matrix);
-      float rotz_matrix[16];
-      m4f_fill_roty_m4fo(M_PI_4/2, rotz_matrix);
-      float rotxy_matrix[16];
-      m4f_mul_m4fo(rotx_matrix, roty_matrix, rotxy_matrix);
-      m4f_mul_m4fo(rotxy_matrix, rotz_matrix, rot_matrix);
-    } else {
-      m4f_copy_m4fo(g_identity, rot_matrix);
-    }
-  
     float init_matrix[16];
     m4f_copy_m4fo(g_identity, init_matrix);
     m4f_mul_m4f(g_proj, init_matrix);
 
     m4f_mul_m4fo(init_matrix, g_view, g_mvp_matrix);
 
-//    m4f_print(g_mvp_matrix);
-//    printf("\n");
-
     glUniformMatrix4fv(g_mvp_id, 1, GL_TRUE, g_mvp_matrix);
-//    glBindBuffer(GL_ARRAY_BUFFER, g_cube_vbuffer_id);
-    glBindVertexArray(g_cube_varray_id);
+    glBindVertexArray(g_varray_id);
 //    draw_menger_sponge(g_recurse_depth);
-    glUniform4f(g_color_id, 1.0, 1.0, 1.0, 1.0);
-/*    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glUniform4f(g_color_id, 0.0, 1.0, 1.0, 1.0);
-    glDrawArrays(GL_TRIANGLES, 6, 6);
-    glUniform4f(g_color_id, 1.0, 0.0, 1.0, 1.0);
-    glDrawArrays(GL_TRIANGLES, 12, 6);
     glUniform4f(g_color_id, 1.0, 1.0, 0.0, 1.0);
-    glDrawArrays(GL_TRIANGLES, 18, 6);
-    glUniform4f(g_color_id, 0.0, 0.0, 1.0, 1.0);
-    glDrawArrays(GL_TRIANGLES, 24, 6);
-    glUniform4f(g_color_id, 0.0, 1.0, 0.0, 1.0);
-    glDrawArrays(GL_TRIANGLES, 30, 6);
-    glUniform4f(g_color_id, 1.0, 0.0, 0.0, 1.0);
-    glDrawArrays(GL_TRIANGLES, 36, 6);
-    glUniform4f(g_color_id, 0.25, 0.25, 0.25, 1.0);
-    glDrawArrays(GL_TRIANGLES, 42, 6);
-*/    glBindBuffer(GL_ARRAY_BUFFER, 0);
 //    draw_cube();
-    glDrawArrays(GL_TRIANGLES, 0, g_buffer_vert_count);
+    glDrawElements(GL_TRIANGLES, 6 * sizeof(g_face_ibuffer), GL_UNSIGNED_BYTE, 0);
 //    draw_menger_sponge(g_recurse_depth);
 //    teardown_light();
   }
@@ -724,20 +729,22 @@ exit:
 const int VERTEX_INDEX_IN_SHADER = 0;
 
 void load_buffers() {
-  glGenVertexArrays(1, &g_cube_varray_id);
-  glBindVertexArray(g_cube_varray_id);
+  glGenVertexArrays(1, &g_varray_id);
+  glBindVertexArray(g_varray_id);
 
-  glGenBuffers(1, &g_cube_vbuffer_id);
-  glBindBuffer(GL_ARRAY_BUFFER, g_cube_vbuffer_id);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(g_slow_cube_vbuffer),
-    g_slow_cube_vbuffer, GL_STATIC_DRAW);
+  glGenBuffers(DATA_COUNT, g_buffer_id);
+
+  glBindBuffer(GL_ARRAY_BUFFER, g_buffer_id[DATA_VERTEX]);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(g_unit_vbuffer),
+    g_unit_vbuffer, GL_STATIC_DRAW);
   glVertexAttribPointer(VERTEX_INDEX_IN_SHADER, 3, GL_FLOAT, GL_FALSE, 0, 0);
   glEnableVertexAttribArray(VERTEX_INDEX_IN_SHADER);
 
-  glGenBuffers(1, &g_cube_ibuffer_id);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_cube_ibuffer_id);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(g_cube_ibuffer),
-    g_cube_ibuffer, GL_STATIC_DRAW);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_buffer_id[DATA_INDEX]);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(g_unit_ibuffer),
+    g_unit_ibuffer, GL_STATIC_DRAW);
+
+  glBindVertexArray(0);
 
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -862,10 +869,56 @@ void check_minimum_opengl_version() {
   }
 }
 
+// todo: extract globals
+float* apply_transform_to_face(float* m, float* output_buffer) {
+  m3f_mul_av3fo(m, g_face_vbuffer, sizeof(g_face_vbuffer), output_buffer);
+  return output_buffer + sizeof(g_face_vbuffer)/sizeof(g_face_vbuffer[0]);
+}
+
+void add_transform_glub(const GLubyte* in_begin, const GLubyte* in_end, GLubyte* out,
+GLubyte value) {
+  for (; in_begin != in_end; ++in_begin) {
+    *out = *in_begin + value;
+    ++out;
+  }
+}
+
+void calculate_unit_vbuffer() {
+  memcpy(g_unit_vbuffer, g_face_vbuffer, sizeof(g_face_vbuffer));
+  float* output_buffer = g_unit_vbuffer + sizeof(g_face_vbuffer)/sizeof(g_face_vbuffer[0]);
+  float m[9];
+  m3f_fill_rotx_m3fo(M_PI, m);
+  output_buffer = apply_transform_to_face(m, output_buffer);
+  m3f_fill_rotx_m3fo(M_PI_2, m);
+  output_buffer = apply_transform_to_face(m, output_buffer);
+  m3f_fill_rotx_m3fo(-M_PI_2, m);
+  output_buffer = apply_transform_to_face(m, output_buffer);
+  m3f_fill_roty_m3fo(M_PI_2, m);
+  output_buffer = apply_transform_to_face(m, output_buffer);
+  m3f_fill_roty_m3fo(-M_PI_2, m);
+  output_buffer = apply_transform_to_face(m, output_buffer);
+}
+
+void calculate_unit_ibuffer() {
+  memcpy(g_unit_ibuffer, g_face_ibuffer, sizeof(g_face_ibuffer));
+  const GLubyte* face_ibuffer_end = g_face_ibuffer + sizeof(g_face_ibuffer);
+  size_t i;
+  for (i = 1; i < 6; ++i) {
+    add_transform_glub(g_face_ibuffer, face_ibuffer_end, 
+      g_unit_ibuffer + (i * sizeof(g_face_ibuffer)), i * 32);
+  }
+}
+
+void calculate_unit() {
+  calculate_unit_vbuffer();
+  calculate_unit_ibuffer();
+}
+
 void init() {
   check_minimum_opengl_version();
   load_glew();
   load_shaders();
+  calculate_unit();
   load_buffers();
 
   g_mvp_id = glGetUniformLocation(g_program_id, "mvp");
@@ -960,7 +1013,7 @@ enum {
 
 unsigned g_command_state = NORMAL;
 enum { MAX_ARG_LENGTH = 5 };
-char g_arg_text[MAX_ARG_LENGTH + 1] = {};
+char g_arg_text[MAX_ARG_LENGTH + 1] = { 0 };
 size_t g_arg_text_i = 0;
 
 void key_press(unsigned char key, int x, int y) {
@@ -1166,9 +1219,8 @@ void calculate_normals() {
 }
 
 void cleanup() {
-  glDeleteBuffers(1, &g_cube_vbuffer_id);
-  glDeleteBuffers(1, &g_cube_ibuffer_id);
-  glDeleteVertexArrays(1, &g_cube_varray_id);
+  glDeleteBuffers(DATA_COUNT, g_buffer_id);
+  glDeleteVertexArrays(1, &g_varray_id);
 }
 
 int main(int argc, char** argv) {

@@ -10,6 +10,12 @@
 #include "vector_math.h"
 #include "vector_debug.h"
 
+#ifndef BUFFER_OFFSET
+#define BUFFER_OFFSET(i) ((char *)NULL + (i))
+#else
+#error BUFFER_OFFSET already defined!
+#endif
+
 const float g_ortho[] = {
   1, 0, 0, 0,
   0, 1, 0, 0,
@@ -652,6 +658,11 @@ void recalculate_sponge() {
   }
 }
 
+void draw_face(size_t face_index, GLsizei instance_count) {
+  glDrawElementsInstanced(GL_TRIANGLES, sizeof(g_face_ibuffer), 
+    GL_UNSIGNED_BYTE, BUFFER_OFFSET(face_index * sizeof(g_face_ibuffer)), instance_count);
+}
+
 GLuint g_program_id;
 
 unsigned g_skip_sponge_redraw = 0;
@@ -681,10 +692,24 @@ void display() {
 
     glUniformMatrix4fv(g_mvp_id, 1, GL_TRUE, g_mvp_matrix);
     glBindVertexArray(g_varray_id);
-//    draw_menger_sponge(g_recurse_depth);
+
+    int count = 1;
+    unsigned i;
+    for (i = 0; i < g_recurse_depth; ++i) {
+      count *= 20;
+    }
     glUniform4f(g_color_id, 1.0, 1.0, 0.0, 1.0);
-//    draw_cube();
-    glDrawElements(GL_TRIANGLES, 6 * sizeof(g_face_ibuffer), GL_UNSIGNED_BYTE, 0);
+    draw_face(0, count);
+    glUniform4f(g_color_id, 1.0, 0.0, 1.0, 1.0);
+    draw_face(1, count);
+    glUniform4f(g_color_id, 0.0, 1.0, 1.0, 1.0);
+    draw_face(2, count);
+    glUniform4f(g_color_id, 1.0, 0.0, 0.0, 1.0);
+    draw_face(3, count);
+    glUniform4f(g_color_id, 0.0, 0.0, 1.0, 1.0);
+    draw_face(4, count);
+    glUniform4f(g_color_id, 0.0, 1.0, 0.0, 1.0);
+    draw_face(5, count);
 //    draw_menger_sponge(g_recurse_depth);
 //    teardown_light();
   }
@@ -784,7 +809,7 @@ void link_program(GLuint program_id) {
 
 void load_shaders() {
   int vert_shader_length;
-  char* vert_shader_text = load_file("basic.vert", &vert_shader_length);
+  char* vert_shader_text = load_file("instanced.vert", &vert_shader_length);
   int frag_shader_length;
   char* frag_shader_text = load_file("basic.frag", &frag_shader_length);
 
@@ -859,9 +884,9 @@ int check_version_string(const char* name, const char* version,
 void check_minimum_opengl_version() {
   int fail = 0;
   fail |= check_version_string("OpenGL",
-    (const char*)glGetString(GL_VERSION), 3, 0, "3.0");
+    (const char*)glGetString(GL_VERSION), 3, 3, "3.3");
   fail |= check_version_string("OpenGL Shading Language",
-    (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION), 1, 3, "1.30");
+    (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION), 3, 3, "3.30");
   if (fail) {
     fprintf(stderr, COLOR_RED
       "You do not meet the minimum OpenGL requirements!\n"

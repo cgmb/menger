@@ -1,0 +1,5 @@
+#!/bin/sh -e
+LD_PRELOAD=$APITRACE_BIN/wrappers/glxtrace.so ./$@
+TRACEFILE=$1.trace
+$APITRACE_BIN/qapitrace $TRACEFILE
+rm $TRACEFILE

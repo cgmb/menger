@@ -11,7 +11,7 @@ release: menger
 
 debug: menger
 
-menger: main.c vector_math.h
+menger: main.c vector_math.h vector_debug.h
 	$(CC) $< -o $(EXENAME) $(CFLAGS) $(LIBS)
 
 run:

@@ -101,13 +101,13 @@ void m3f_fill_rotz_m3fo(float rz, float* result) {
 void rotatex_v3fo(float rx, const float* v, float* result) {
   float rm[9];
   m3f_fill_rotx_m3fo(rx, rm);
-  m3f_mul_m3fo(rm, v, result);
+  m3f_mul_v3fo(rm, v, result);
 }
 
 void rotatey_v3fo(float ry, const float* v, float* result) {
   float rm[16];
   m3f_fill_roty_m3fo(ry, rm);
-  m3f_mul_m3fo(rm, v, result);
+  m3f_mul_v3fo(rm, v, result);
 }
 
 void m4f_copy_m4fo(const float* m, float* result) {

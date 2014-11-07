@@ -313,16 +313,19 @@ typedef enum { ORTHO, PERSPECTIVE } proj_t;
 proj_t g_main_proj = ORTHO;
 
 void reset_to(proj_t proj) {
+  glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
   if (proj == ORTHO) {
     glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
   } else {
     // because the depth buffer uses a logorithmic scale
     // bad things happen when the frustum crosses z=0
-    glFrustum(0.0, 1.0, 0.0, 1.0, 3.0, 50.0);
-    glTranslatef(0, 0, -4.0);
+    glFrustum(-0.5, 0.5, -0.5, 0.5, 1.0, 100.0);
+    glTranslatef(-0.5/g_aspect_scale_x, -0.5/g_aspect_scale_y, -2.0);
   }
   glScalef(g_aspect_scale_x, g_aspect_scale_y, 1.0);
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
 }
 
 void setup_initial_transform() {
@@ -401,7 +404,7 @@ void init() {
   glClearColor(0.0, 0.0, 0.0, 0.0);
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_CULL_FACE);
-  glMatrixMode(GL_PROJECTION);
+  glMatrixMode(GL_MODELVIEW);
 
   init_light();
   init_material();

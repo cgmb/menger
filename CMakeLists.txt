@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 2.8)
+project(menger)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11 -Wall -Wextra -Wno-unused-parameter")
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Emscripten")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -s LEGACY_GL_EMULATION=1")
+endif()
+add_executable(menger main.c)

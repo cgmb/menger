@@ -107,15 +107,10 @@ const float* a, const float* b, const float* c, float* result) {
   normalize_3f(result);
 }
 
-int g_use_lighting = 0;
-
 void draw_cube() {
   glBegin(GL_TRIANGLES);
   size_t i;
   for (i = 0; i < g_cube_ibuffer_size; ++i) {
-    if (g_use_lighting) {
-      glNormal3fv(vertex3f(g_cube_normal_buffer, i/3u));
-    }
     glColor3f(
       normal_scale(i/6, 0, 6),
       normal_scale(i/6, 2, 6),
@@ -332,50 +327,6 @@ void setup_initial_transform() {
   glRotatef(30.0, 1.0, 1.0, 1.0);
 }
 
-void init_light() {
-  float position[] = { 1, 1, 1, 0 };
-  glLightfv(GL_LIGHT0, GL_POSITION, position);
-  float ambient_color[] = { 0.125, 0.125, 0.125, 1 };
-  glLightfv(GL_LIGHT0, GL_AMBIENT, ambient_color);
-  float diffuse_color[] = { 1, 1, 1, 1 };
-  glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse_color);
-  float specular_color[] = { 0.75, 0.75, 0.75, 1 };
-  glLightfv(GL_LIGHT0, GL_SPECULAR, specular_color);
-}
-
-void init_material() {
-  glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-  float specular_color[] = { 0.75, 0.75, 0.75, 1 };
-  glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, specular_color);
-  float emission_color[] = { 0, 0, 0, 1 };
-  glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, emission_color);
-}
-
-void setup_light() {
-  if (g_use_lighting) {
-    float original_position[] = { 1, 1, 1, 0 };
-    float transformed_1[4] = {};
-    float transformed_2[4] = {};
-    float x = -g_camera_rotation_y / 180.0 * M_PI;
-    float y = -g_camera_rotation_x / 180.0 * M_PI;
-    rotatey_3fo(y, original_position, transformed_1);
-    rotatex_3fo(x, transformed_1, transformed_2);
-    glLightfv(GL_LIGHT0, GL_POSITION, transformed_2);
-
-    glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
-    glEnable(GL_COLOR_MATERIAL);
-  }
-}
-
-void teardown_light() {
-  if (g_use_lighting) {
-    glDisable(GL_LIGHT0);
-    glDisable(GL_LIGHTING);
-    glDisable(GL_COLOR_MATERIAL);
-  }
-}
-
 unsigned g_skip_sponge_redraw = 0;
 
 void display() {
@@ -385,11 +336,9 @@ void display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     setup_initial_transform();
-    setup_light();
 
     setup_world_camera();
     draw_menger_sponge(g_recurse_depth);
-    teardown_light();
   }
   reset_to(ORTHO);
   draw_buttons();
@@ -402,9 +351,6 @@ void init() {
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_CULL_FACE);
   glMatrixMode(GL_PROJECTION);
-
-  init_light();
-  init_material();
 }
 
 int g_rotating = 0;
@@ -477,7 +423,6 @@ void mouse_move(int x, int y) {
 
 enum {
   NORMAL = 27, // esc
-  LIGHT_ENTRY = 'l',
   SCALE_ENTRY = 's',
   RECURSE_ENTRY = 'r',
   PROJECTION_ENTRY = 'p',
@@ -555,32 +500,12 @@ void key_press(unsigned char key, int x, int y) {
       }
       g_command_state = NORMAL;
       break;
-    case LIGHT_ENTRY:
-      if (key == '0') {
-        g_use_lighting = 0;
-        glutPostRedisplay();
-        printf("%c\n", key);
-      } else if (key == '1') {
-        g_use_lighting = 1;
-        glutPostRedisplay();
-        printf("%c\n", key);
-      } else if (key == 27) {
-        printf(" - cancelled\n");
-      } else {
-        printf("\nUnknown light state\n");
-        printf("Known states are:\n"
-          "  0 - off\n"
-          "  1 - on\n");
-      }
-      g_command_state = NORMAL;
-      break;
     default: // enter state
       g_command_state = key;
       switch(g_command_state) {
         case SCALE_ENTRY:
         case RECURSE_ENTRY:
         case PROJECTION_ENTRY:
-        case LIGHT_ENTRY:
           memset(g_arg_text, 0, MAX_ARG_LENGTH);
           g_arg_text_i = 0;
           printf("%c:", key);
@@ -593,7 +518,6 @@ void key_press(unsigned char key, int x, int y) {
         default:
           printf("Unknown command: %c\n", key);
           printf("Known commands are:\n"
-            "  l - lighting {0,1}\n"
             "  s - scale\n"
             "  r - recursion depth [0,%u]\n"
             "  p - perspective {o,p}\n"
@@ -664,11 +588,6 @@ void set_projection_perspective() {
   glutPostRedisplay();
 }
 
-void toggle_use_lighting() {
-  g_use_lighting = g_use_lighting ? 0 : 1;
-  glutPostRedisplay();
-}
-
 void setup_callbacks() {
   g_button_callbacks[0] = set_recursive_depth_0;
   g_button_callbacks[1] = set_recursive_depth_1;
@@ -679,7 +598,6 @@ void setup_callbacks() {
   g_button_callbacks[18] = set_scale_5;
   g_button_callbacks[32] = set_projection_ortho;
   g_button_callbacks[33] = set_projection_perspective;
-  g_button_callbacks[48] = toggle_use_lighting;
 }
 
 void calculate_normals() {
